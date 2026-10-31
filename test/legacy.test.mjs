@@ -71,7 +71,7 @@ test("legacy primitive conversions reject untrusted shapes, ranges and malformed
   assert.throws(() => fromLegacy(2147483648, { kind: "int" }), /overflow/);
   assert.throws(() => fromLegacy(Infinity, { kind: "float" }), /non-finite/);
   assert.throws(() => fromLegacy("true", { kind: "boolean" }), /Boolean/);
-  assert.throws(() => fromLegacy("\ud800", { kind: "string" }), /scalar/);
+  assert.throws(() => fromLegacy(String.fromCharCode(0xd800), { kind: "string" }), /scalar/);
   assert.throws(() => fromLegacy("ab", { kind: "char" }), /one Char/);
   assert.deepEqual(fromLegacy("😀", { kind: "char" }), { kind: "char", value: "😀" });
   assert.deepEqual(fromLegacy(null, { kind: "nullable", inner: { kind: "int" } }), { kind: "null", value: null });

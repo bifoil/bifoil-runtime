@@ -24,8 +24,8 @@ test("Unicode operations preserve scalar boundaries, combining marks and prefix 
   assert.equal(scalarOrder("a", "a😀"), -1);
   assert.equal(scalarOrder("a😀", "a"), 1);
   assert.equal(scalarOrder("😀e", "😀e"), 0);
-  assert.equal(isScalarString("\ud800"), false);
-  assert.equal(isScalarString("\udfff"), false);
+  assert.equal(isScalarString(String.fromCharCode(0xd800)), false);
+  assert.equal(isScalarString(String.fromCharCode(0xdfff)), false);
   assert.equal(isSingleScalar("😀"), true);
   assert.equal(isSingleScalar("e\u0301"), false);
 });
