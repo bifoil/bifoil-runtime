@@ -10,6 +10,12 @@ const nativeBaseUrl = window.Scene.baseUrl;
 const saveButton = document.getElementById("save");
 const loadButton = document.getElementById("load");
 const fixture = document.getElementById("fixture");
+const fixtureSources = new Map([
+  ["browser", "/fixtures/browser.json"],
+  ["browser-native", "/fixtures/browser-native.json"],
+  ["browser-output", "/fixtures/browser-output.json"],
+  ["browser-package", "/package/startup.txt"],
+]);
 const selectionKey = "bifoil.browser.acceptance.fixture";
 const storageKey = () => "bifoil.browser.acceptance." + fixture.value;
 const adapter = installChoiceScript(window.Scene, { finish: updateStatus });
@@ -56,7 +62,9 @@ async function loadFixture() {
   const packaged = fixture.value === "browser-package";
   program = null;
   updateStatus();
-  const response = await fetch(packaged ? "/package/startup.txt" : "/fixtures/" + fixture.value + ".json");
+  const sourceUrl = fixtureSources.get(fixture.value);
+  if (!sourceUrl) throw new Error("Unknown original browser fixture");
+  const response = await fetch(sourceUrl);
   if (!response.ok) throw new Error("Cannot load original browser fixture");
   const source = packaged ? await response.text() : null;
   const loaded = packaged ? null : await response.json();

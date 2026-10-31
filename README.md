@@ -218,3 +218,8 @@ node --test --experimental-test-coverage --test-coverage-include="src/**" \
 ```
 
 Set `CHOICESCRIPT_ENGINE` explicitly to include the optional unchanged-engine acceptance tests in coverage.
+
+The headless native host loads an explicitly supplied trusted ChoiceScript JavaScript engine and its utility files.
+Its VM context isolates engine globals; the caller owns the trust decision for that engine installation. Story prose,
+player responses, and checkpoint contents are handled as data. The browser acceptance server serves approved routes
+on loopback; its engine and package roots are selected by the operator.

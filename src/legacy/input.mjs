@@ -3,7 +3,7 @@
 import { check } from "../errors.mjs";
 
 function integerSpelling(value) {
-  const parsed = parseInt(value, 10);
+  const parsed = Number.parseInt(value, 10);
   return !Number.isNaN(parsed) && value == parsed && value.toString() === parsed.toString();
 }
 function present(scene, call, input, variable) {
@@ -26,11 +26,11 @@ export function installInput(scene, call) {
     );
     check(tokens.length > 0, scene.lineMsg() + "input_number requires a minimum");
     const minimum = scene.evaluateValueToken(tokens.shift(), tokens);
-    check(!isNaN(minimum * 1), scene.lineMsg() + "Invalid numeric minimum");
+    check(!Number.isNaN(minimum * 1), scene.lineMsg() + "Invalid numeric minimum");
     check(tokens.length > 0, scene.lineMsg() + "input_number requires a maximum");
     const maximum = scene.evaluateValueToken(tokens.shift(), tokens);
-    check(tokens.length === 0 && !isNaN(maximum * 1), scene.lineMsg() + "Invalid numeric maximum");
-    check(parseFloat(minimum) <= parseFloat(maximum), scene.lineMsg() + "Minimum exceeds maximum");
+    check(tokens.length === 0 && !Number.isNaN(maximum * 1), scene.lineMsg() + "Invalid numeric maximum");
+    check(Number.parseFloat(minimum) <= Number.parseFloat(maximum), scene.lineMsg() + "Minimum exceeds maximum");
     present(
       scene,
       call,
@@ -52,7 +52,7 @@ export function submitInput(scene, call, wait, response) {
     feedback = null;
   if (response === "" && !input.allow_blank) feedback = "Don't just leave it blank! Type something!";
   if (input.kind === "number" && feedback === null) {
-    value = parseFloat(response);
+    value = Number.parseFloat(response);
     if (Number.isNaN(value)) feedback = "Please type in a number.";
     else if (input.integer && !integerSpelling(response)) feedback = "Please type in an integer number.";
     else if (value < input.minimum * 1) feedback = "Please use a number greater than or equal to " + input.minimum;
@@ -86,9 +86,9 @@ export function validateInput(input) {
     check(
       typeof input.minimum === "string" &&
         typeof input.maximum === "string" &&
-        !isNaN(input.minimum * 1) &&
-        !isNaN(input.maximum * 1) &&
-        parseFloat(input.minimum) <= parseFloat(input.maximum) &&
+        !Number.isNaN(input.minimum * 1) &&
+        !Number.isNaN(input.maximum * 1) &&
+        Number.parseFloat(input.minimum) <= Number.parseFloat(input.maximum) &&
         typeof input.integer === "boolean",
       "invalid native number options",
     );

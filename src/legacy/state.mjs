@@ -72,7 +72,7 @@ export function decodeState(snapshot) {
           return encoded[1];
         }
         check(["-0", "NaN", "+Infinity", "-Infinity"].includes(encoded[1]), "invalid native special number");
-        return { "-0": -0, NaN, "+Infinity": Infinity, "-Infinity": -Infinity }[encoded[1]];
+        return { "-0": -0, NaN: Number.NaN, "+Infinity": Infinity, "-Infinity": -Infinity }[encoded[1]];
       }
       case "ref":
         check(
