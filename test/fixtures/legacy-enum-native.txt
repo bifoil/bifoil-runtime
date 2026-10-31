@@ -1,0 +1,6 @@
+*label ask
+*params requested
+*choice
+  #Choose Sad
+    *set answer "Sad"
+    *return

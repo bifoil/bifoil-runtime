@@ -1,0 +1,11 @@
+*label show
+*set calls + 1
+Native before.
+*image /fixtures/output-marker.svg center Native output marker
+Native between.
+*stat_chart
+    percent calls Calls
+Native after.
+*page_break Continue native
+Native resumed.
+*return

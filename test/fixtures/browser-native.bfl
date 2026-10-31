@@ -1,0 +1,12 @@
+legacy var calls: Int = "calls"
+legacy suspend fun readName() -> String = "questions" label "read_name" result "answer"
+legacy suspend fun readNumber() -> Float = "questions" label "read_number" result "answer"
+scene start():
+    val name = readName()
+    val amount = readNumber()
+    prose:
+        ${name}|${amount}|${calls}
+    choice:
+        option "Finish":
+            prose:
+                Done.

@@ -1,0 +1,12 @@
+legacy var calls: Int = "calls"
+legacy suspend fun display() = "questions" label "show"
+scene start():
+    prose:
+        Bifoil before.
+    display()
+    prose:
+        Bifoil after ${calls}.
+    choice:
+        option "Finish":
+            prose:
+                Done.

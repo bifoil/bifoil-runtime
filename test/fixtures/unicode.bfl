@@ -1,0 +1,8 @@
+scene start():
+    var result = ""
+    for character in "A😀e\u{301}":
+        choice:
+            option "Append ${character}":
+                result += character
+    prose:
+        ${result}

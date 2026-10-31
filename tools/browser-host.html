@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Bifoil browser acceptance</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="/engine/style.css" />
+    <style id="dynamic"></style>
+    <style>
+      body {
+        max-width: 50rem;
+        margin: 2rem auto;
+        padding: 0 1rem;
+        font:
+          1rem/1.5 system-ui,
+          sans-serif;
+      }
+      header {
+        border-bottom: 1px solid #aaa;
+        margin-bottom: 1.5rem;
+        padding-bottom: 1rem;
+      }
+      button {
+        margin: 0.25rem;
+        padding: 0.5rem 0.8rem;
+      }
+      label {
+        display: block;
+        margin: 0.5rem 0;
+      }
+      #status {
+        min-height: 1.5em;
+      }
+    </style>
+    <script>
+      window.alreadyLoaded = true;
+      window.rootDir = "/engine/";
+      window.storeName = null;
+    </script>
+    <script src="/engine/persist.js"></script>
+    <script src="/engine/alertify.min.js"></script>
+    <script src="/engine/util.js"></script>
+    <script src="/engine/ui.js"></script>
+    <script src="/engine/scene.js"></script>
+    <script src="/engine/navigator.js"></script>
+    <script type="module" src="/browser-host.mjs"></script>
+  </head>
+  <body>
+    <header>
+      <h1>Bifoil browser acceptance</h1>
+      <p>An original fixture using the supplied, unchanged ChoiceScript browser renderer.</p>
+      <label for="fixture">Fixture</label>
+      <select id="fixture">
+        <option value="browser">Typed choices and suspended expressions</option>
+        <option value="browser-native">Native text and number input</option>
+        <option value="browser-output">Native image and chart ordering</option>
+        <!-- package-fixture -->
+      </select>
+      <button id="restart" type="button">Restart fixture</button>
+      <button id="save" type="button" disabled>Save checkpoint</button>
+      <button id="load" type="button" disabled>Load checkpoint</button>
+      <p id="status" role="status">Loading fixture…</p>
+    </header>
+    <main id="main"><div id="text"></div></main>
+  </body>
+</html>

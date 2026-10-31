@@ -1,0 +1,78 @@
+{
+  "format": "bifoil.program.v2",
+  "profile": "bifoil-vm.v2",
+  "build": "15ab409ffcb399bb1b62407aec203e463e3675f8b3882614c65888cde0547ce9",
+  "entry": "main.start",
+  "modules": { "main": "63ff116d131f583adeaa455e508517b63a724c9eff43a033b0aa081aa12c0d9a" },
+  "functions": {
+    "main.start": {
+      "signature": { "id": "main.start", "params": [], "result": { "kind": "unit" }, "suspend": true, "scene": true },
+      "code": [
+        { "op": "constant", "ty": { "kind": "string" }, "value": "", "span": { "file": "src/main.bfl", "line": 2 } },
+        {
+          "op": "declare",
+          "name": "result",
+          "ty": { "kind": "string" },
+          "mutable": true,
+          "span": { "file": "src/main.bfl", "line": 2 }
+        },
+        {
+          "op": "constant",
+          "ty": { "kind": "string" },
+          "value": "A\ud83d\ude00e\u0301",
+          "span": { "file": "src/main.bfl", "line": 3 }
+        },
+        { "op": "iter_start", "id": 0, "span": { "file": "src/main.bfl", "line": 3 } },
+        { "op": "enter", "span": { "file": "src/main.bfl", "line": 3 } },
+        {
+          "op": "iter_next",
+          "id": 0,
+          "name": "character",
+          "ty": { "kind": "char" },
+          "target": 25,
+          "span": { "file": "src/main.bfl", "line": 3 }
+        },
+        { "op": "begin_choice", "span": { "file": "src/main.bfl", "line": 4 } },
+        { "op": "constant", "ty": { "kind": "boolean" }, "value": true, "span": { "file": "src/main.bfl", "line": 4 } },
+        { "op": "jump_false", "target": 15, "span": { "file": "src/main.bfl", "line": 4 } },
+        { "op": "constant", "ty": { "kind": "boolean" }, "value": true, "span": { "file": "src/main.bfl", "line": 4 } },
+        {
+          "op": "constant",
+          "ty": { "kind": "string" },
+          "value": "Append ",
+          "span": { "file": "src/main.bfl", "line": 4 }
+        },
+        { "op": "load", "name": "character", "span": { "file": "src/main.bfl", "line": 4 } },
+        { "op": "constant", "ty": { "kind": "string" }, "value": "", "span": { "file": "src/main.bfl", "line": 4 } },
+        { "op": "format", "count": 3, "span": { "file": "src/main.bfl", "line": 4 } },
+        { "op": "offer", "target": 16, "span": { "file": "src/main.bfl", "line": 4 } },
+        { "op": "choose", "fallback": null, "span": { "file": "src/main.bfl", "line": 4 } },
+        { "op": "enter", "span": { "file": "src/main.bfl", "line": 4 } },
+        { "op": "load", "name": "result", "span": { "file": "src/main.bfl", "line": 6 } },
+        { "op": "load", "name": "character", "span": { "file": "src/main.bfl", "line": 6 } },
+        { "op": "binary", "operator": "+", "span": { "file": "src/main.bfl", "line": 6 } },
+        { "op": "store", "name": "result", "span": { "file": "src/main.bfl", "line": 6 } },
+        { "op": "exit", "span": { "file": "src/main.bfl", "line": 4 } },
+        { "op": "jump", "target": 23, "span": { "file": "src/main.bfl", "line": 4 } },
+        { "op": "exit", "span": { "file": "src/main.bfl", "line": 3 } },
+        { "op": "jump", "target": 4, "span": { "file": "src/main.bfl", "line": 3 } },
+        { "op": "exit", "span": { "file": "src/main.bfl", "line": 3 } },
+        { "op": "iter_end", "id": 0, "span": { "file": "src/main.bfl", "line": 3 } },
+        { "op": "prose_start", "span": { "file": "src/main.bfl", "line": 7 } },
+        { "op": "enter", "span": { "file": "src/main.bfl", "line": 7 } },
+        { "op": "constant", "ty": { "kind": "string" }, "value": "", "span": { "file": "src/main.bfl", "line": 8 } },
+        { "op": "load", "name": "result", "span": { "file": "src/main.bfl", "line": 8 } },
+        { "op": "constant", "ty": { "kind": "string" }, "value": "", "span": { "file": "src/main.bfl", "line": 8 } },
+        { "op": "format", "count": 3, "span": { "file": "src/main.bfl", "line": 8 } },
+        { "op": "prose_text", "span": { "file": "src/main.bfl", "line": 8 } },
+        { "op": "exit", "span": { "file": "src/main.bfl", "line": 7 } },
+        { "op": "prose_end", "span": { "file": "src/main.bfl", "line": 7 } },
+        { "op": "constant", "ty": { "kind": "unit" }, "value": null, "span": { "file": "src/main.bfl", "line": 1 } },
+        { "op": "return", "span": { "file": "src/main.bfl", "line": 1 } }
+      ],
+      "init": false,
+      "local": false
+    }
+  },
+  "init": []
+}

@@ -1,0 +1,10 @@
+*label read_name
+*set calls + 1
+What is your name?
+*input_text answer
+*return
+*label read_number
+*set calls + 1
+Choose a number from 1.5 to 9.5.
+*input_number answer 1.5 9.5
+*return

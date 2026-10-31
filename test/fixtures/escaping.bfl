@@ -1,0 +1,14 @@
+fun makeCounter() -> () -> Int:
+    var count = 0
+    fun next() -> Int:
+        count += 1
+        return count
+    return ::next
+
+scene start():
+    val counter = makeCounter()
+    val first = counter()
+    choice:
+        option "Continue from ${first}":
+            prose:
+                ${counter()} then ${counter()}.

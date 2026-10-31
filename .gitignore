@@ -1,0 +1,14 @@
+# Local agent state and development reports
+/.codex/
+/.bifoil/development/
+
+# Local editor state
+/.idea/
+/.vscode/
+
+# Operating-system metadata
+.DS_Store
+Thumbs.db
+
+# Browser acceptance recordings
+/output/playwright/

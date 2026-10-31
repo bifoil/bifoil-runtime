@@ -1,0 +1,16 @@
+shared var preparations: Int = 0
+suspend fun ask() -> Int:
+    preparations += 1
+    choice:
+        option "Unavailable" enabledIf false:
+            return 0
+        option "Take ${preparations} and \${literal}":
+            return 2
+scene start():
+    val result = 10 + ask()
+    prose:
+        First ${result}; prepared ${preparations}.
+    choice:
+        option "Finish":
+            prose:
+                Done.

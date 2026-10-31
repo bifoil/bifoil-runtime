@@ -1,0 +1,6 @@
+*label ask
+*set calls + 1
+*choice
+  #Take ${calls}
+    *set answer (2 + 3)
+    *return

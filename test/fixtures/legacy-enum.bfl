@@ -1,0 +1,15 @@
+enum Mood:
+    case Happy
+    case Sad
+enum OtherMood:
+    case Happy
+data class Record:
+    val number: Int
+legacy var current: Mood = "current"
+legacy suspend fun ask(value: Mood = Mood.Happy) -> Mood = "questions" label "ask" result "answer"
+scene start():
+    val before = current
+    current = Mood.Sad
+    val answer = ask(Mood.Happy)
+    prose:
+        ${before == Mood.Happy}|${current == Mood.Sad}|${answer == Mood.Sad}

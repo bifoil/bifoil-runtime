@@ -1,0 +1,8 @@
+shared var trace: String = ""
+fun mark(tag: String) -> Int:
+    trace += tag
+    return 1
+fun take(a: Int = mark("d1"), b: Int = mark("d2"), c: Int = 0) -> Int = a + b + c
+scene start():
+    prose:
+        ${take(c = mark("s"))} ${trace}
