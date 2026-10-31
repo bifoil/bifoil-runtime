@@ -214,6 +214,7 @@ Generate LCOV before scanning with the built-in Node test runner:
 ```sh
 mkdir -p .bifoil/development/sonar
 node --test --experimental-test-coverage --test-coverage-include="src/**" \
+  --test-coverage-include="tools/browser-fixtures.mjs" \
   --test-reporter=lcov --test-reporter-destination=.bifoil/development/sonar/runtime.lcov test/*.test.mjs
 ```
 

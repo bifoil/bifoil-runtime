@@ -31,7 +31,7 @@ function requestedFile(url) {
   if (pathname === "/") return path.join(runtime, "tools/browser-host.html");
   if (packageDirectory && /^\/package\/(?:startup|bifoil_code_[0-9a-f]{64})\.txt$/.test(pathname))
     return path.join(packageDirectory, pathname.slice(9));
-  if (["/browser-host.mjs", "/browser-save.mjs"].includes(pathname))
+  if (["/browser-host.mjs", "/browser-save.mjs", "/browser-fixtures.mjs"].includes(pathname))
     return path.join(runtime, "tools", pathname.slice(1));
   if (["/fixtures/browser.json", "/fixtures/browser-native.json", "/fixtures/browser-output.json"].includes(pathname))
     return path.join(runtime, "test", pathname.slice(1));
