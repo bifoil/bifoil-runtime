@@ -200,3 +200,21 @@ authenticated and are not a security boundary against untrusted compiled code or
 
 No ChoiceScript engine source is vendored, modified, or relicensed here. Bifoil is independent of Choice of Games and
 upstream ChoiceScript. No release, remote, or license selection is established by this work.
+
+## Sonar analysis
+
+[SonarQube Cloud](https://sonarcloud.io/dashboard?id=bifoil_bifoil-runtime) analyzes this public repository.
+[Scanner settings](sonar-project.properties) separate original production sources from tests. Run the standard
+`sonar-scanner` with `SONAR_TOKEN` supplied through the environment; never save a token in source or command arguments.
+Scanner output stays under ignored `.bifoil/development/sonar/`. Use scanner-based analysis with automatic analysis
+disabled for this project. A completed analysis and its quality gate are separate from passing local tests.
+
+Generate LCOV before scanning with the built-in Node test runner:
+
+```sh
+mkdir -p .bifoil/development/sonar
+node --test --experimental-test-coverage --test-coverage-include="src/**" \
+  --test-reporter=lcov --test-reporter-destination=.bifoil/development/sonar/runtime.lcov test/*.test.mjs
+```
+
+Set `CHOICESCRIPT_ENGINE` explicitly to include the optional unchanged-engine acceptance tests in coverage.
