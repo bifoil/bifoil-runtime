@@ -12,3 +12,6 @@ Thumbs.db
 
 # Browser acceptance recordings
 /output/playwright/
+
+# Installed development dependencies
+/node_modules/

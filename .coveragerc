@@ -1,0 +1,8 @@
+[run]
+branch = True
+relative_files = True
+source = tools
+data_file = .bifoil/development/sonar/python.coverage
+
+[xml]
+output = .bifoil/development/sonar/python-coverage.xml
