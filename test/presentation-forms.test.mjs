@@ -79,3 +79,89 @@ test("consuming text input removes its form without removing a newly prepared ch
   assert.equal(forms.length, 1);
   assert.notEqual(forms[0], previous);
 });
+
+test("presentation checks missing hooks and handles a host without DOM controls", (t) => {
+  const names = ["main", "document", "printOptions", "printInput"];
+  const saved = new Map(names.map((name) => [name, Object.getOwnPropertyDescriptor(globalThis, name)]));
+  t.after(() => {
+    for (const [name, descriptor] of saved) {
+      if (descriptor) Object.defineProperty(globalThis, name, descriptor);
+      else Reflect.deleteProperty(globalThis, name);
+    }
+  });
+  for (const name of names) Reflect.deleteProperty(globalThis, name);
+  const scene = { paragraph() {} };
+  assert.throws(() => renderChoice(scene, option, () => {}), /printOptions host hook/);
+  assert.throws(() => renderInput(scene, { kind: "text" }, () => {}), /printInput host hook/);
+  let selected;
+  globalThis.printOptions = (_groups, items, respond) => {
+    assert.equal(items[0].unselectable, true);
+    selected = respond;
+  };
+  let received;
+  renderChoice(scene, [{ label: "Unavailable", enabled: false }], (index) => {
+    received = index;
+  });
+  selected({ line: 0 });
+  assert.equal(received, 0);
+});
+
+test("input feedback and legacy form discovery preserve host options and consumed controls", (t) => {
+  const names = ["document", "printInput", "asyncAlert"];
+  const saved = new Map(names.map((name) => [name, Object.getOwnPropertyDescriptor(globalThis, name)]));
+  t.after(() => {
+    for (const [name, descriptor] of saved) {
+      if (descriptor) Object.defineProperty(globalThis, name, descriptor);
+      else Reflect.deleteProperty(globalThis, name);
+    }
+  });
+  Reflect.deleteProperty(globalThis, "asyncAlert");
+  const forms = [],
+    printed = [],
+    alerts = [],
+    callbacks = [],
+    calls = [];
+  const parent = { querySelectorAll: () => forms };
+  globalThis.document = {
+    getElementById: (id) => {
+      assert.equal(id, "text");
+      return parent;
+    },
+  };
+  globalThis.printInput = (target, options, respond, minimum, maximum, step) => {
+    calls.push({ target, options, minimum, maximum, step });
+    const form = {
+      remove() {
+        forms.splice(forms.indexOf(form), 1);
+      },
+    };
+    forms.push(form);
+    callbacks.push(respond);
+  };
+  const scene = { paragraph() {} };
+  const replies = [];
+  renderInput(
+    scene,
+    { kind: "number", feedback: "Try again", minimum: 1, maximum: 9, integer: true },
+    (reply) => replies.push(reply),
+    (_scene, text) => printed.push(text),
+  );
+  assert.deepEqual(printed, ["Try again"]);
+  assert.deepEqual(calls[0], {
+    target: undefined,
+    options: { long: false, allow_blank: undefined, numeric: true },
+    minimum: 1,
+    maximum: 9,
+    step: 1,
+  });
+  callbacks[0](7);
+  assert.deepEqual(replies, ["7"]);
+  assert.equal(forms.length, 0);
+  globalThis.asyncAlert = (message) => alerts.push(message);
+  renderInput(scene, { kind: "text", feedback: "Helpful feedback", long: true, allow_blank: true }, () => {});
+  assert.deepEqual(alerts, ["Helpful feedback"]);
+  assert.equal(calls[1].step, undefined);
+  assert.deepEqual(calls[1].options, { long: true, allow_blank: true, numeric: false });
+  callbacks[1]("answer");
+  assert.equal(forms.length, 0);
+});

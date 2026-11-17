@@ -281,6 +281,7 @@ export function executeInstruction(machine, instruction, frame, pop) {
       }
       break;
     case "uninitialized": {
+      check(machine.state.cells.length < 100000, "runtime heap budget exceeded");
       check(!Object.hasOwn(machine.state.envs[frame.env].bindings, instruction.name), "duplicate binding");
       const id =
         machine.state.cells.push({

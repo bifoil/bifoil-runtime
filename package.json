@@ -4,9 +4,28 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test test/*.test.mjs"
+    "test": "node --test test/*.test.mjs",
+    "test:coverage": "node tools/collect-coverage.mjs"
   },
   "engines": {
     "node": ">=24"
+  },
+  "bifoilQuality": {
+    "includes": [
+      "src/**",
+      "tools/**"
+    ],
+    "directory": ".bifoil/development/sonar",
+    "requiredEnvironment": [
+      "CHOICESCRIPT_ENGINE"
+    ]
+  },
+  "packageManager": "pnpm@12.6.0",
+  "devDependencies": {
+    "istanbul-lib-coverage": "3.2.2",
+    "istanbul-lib-instrument": "6.0.3",
+    "istanbul-lib-report": "3.0.1",
+    "istanbul-reports": "3.2.0",
+    "linkedom": "0.18.12"
   }
 }

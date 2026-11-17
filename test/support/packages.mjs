@@ -13,7 +13,10 @@ export function splitCompiledProgram(program, { lazy = false } = {}) {
     chunks = Object.create(null),
     modules = Object.create(null);
   for (const [id, fn] of Object.entries(program.functions)) {
-    const module = id.split(".")[0];
+    const module =
+      Object.keys(program.modules)
+        .filter((name) => id.startsWith(name + "."))
+        .sort((first, second) => second.length - first.length)[0] ?? id.split(".")[0];
     if (!groups.has(module)) groups.set(module, {});
     groups.get(module)[id] = fn;
   }

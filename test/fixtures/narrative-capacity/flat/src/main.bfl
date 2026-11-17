@@ -1,0 +1,8 @@
+import stats.visits
+import rooms.r0000.enter as room0000
+scene start():
+    choice:
+        option "Room 0000":
+            visit room0000()
+    prose:
+        Finished ${visits}

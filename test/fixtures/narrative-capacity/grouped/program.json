@@ -1,0 +1,659 @@
+{
+  "shared_order": [
+    "stats.visits"
+  ],
+  "shared": {
+    "stats.visits": {
+      "dependencies": [],
+      "order": 0,
+      "ty": {
+        "kind": "int"
+      },
+      "mutable": true,
+      "initializer": "stats.$shared:visits"
+    }
+  },
+  "format": "bifoil.program.v2",
+  "profile": "bifoil-vm.v3",
+  "build": "cccc8f1030fe33f3601c6a807c17dfde7d403e72ba90c1ffee45b2c9c4a84cdf",
+  "entry": "main.start",
+  "modules": {
+    "main": "994400d1e2ced9719f8210f54fbfafdf5979b2504f9087a9f609e5adc318dfa4",
+    "rooms.r0000": "c781b9d8203125aaf40eb2b8ac05a88323fd5ea5bde37be5ba93972e6633eedc",
+    "stats": "851c97a5dc349859d51d5ac552646953a196391f9cfb0371428a3f940655b2f1"
+  },
+  "functions": {
+    "main.start": {
+      "signature": {
+        "id": "main.start",
+        "params": [],
+        "result": {
+          "kind": "unit"
+        },
+        "suspend": true,
+        "scene": true
+      },
+      "code": [
+        {
+          "op": "begin_choice",
+          "span": {
+            "file": "src/main.bfl",
+            "line": 4
+          }
+        },
+        {
+          "op": "constant",
+          "ty": {
+            "kind": "boolean"
+          },
+          "value": true,
+          "span": {
+            "file": "src/main.bfl",
+            "line": 5
+          }
+        },
+        {
+          "op": "jump_false",
+          "target": 6,
+          "span": {
+            "file": "src/main.bfl",
+            "line": 4
+          }
+        },
+        {
+          "op": "constant",
+          "ty": {
+            "kind": "boolean"
+          },
+          "value": true,
+          "span": {
+            "file": "src/main.bfl",
+            "line": 5
+          }
+        },
+        {
+          "op": "constant",
+          "ty": {
+            "kind": "string"
+          },
+          "value": "Group 0000",
+          "span": {
+            "file": "src/main.bfl",
+            "line": 5
+          }
+        },
+        {
+          "op": "offer",
+          "target": 7,
+          "span": {
+            "file": "src/main.bfl",
+            "line": 4
+          }
+        },
+        {
+          "op": "choose",
+          "fallback": null,
+          "span": {
+            "file": "src/main.bfl",
+            "line": 4
+          }
+        },
+        {
+          "op": "enter",
+          "span": {
+            "file": "src/main.bfl",
+            "line": 4
+          }
+        },
+        {
+          "op": "begin_choice",
+          "span": {
+            "file": "src/main.bfl",
+            "line": 6
+          }
+        },
+        {
+          "op": "constant",
+          "ty": {
+            "kind": "boolean"
+          },
+          "value": true,
+          "span": {
+            "file": "src/main.bfl",
+            "line": 7
+          }
+        },
+        {
+          "op": "jump_false",
+          "target": 14,
+          "span": {
+            "file": "src/main.bfl",
+            "line": 6
+          }
+        },
+        {
+          "op": "constant",
+          "ty": {
+            "kind": "boolean"
+          },
+          "value": true,
+          "span": {
+            "file": "src/main.bfl",
+            "line": 7
+          }
+        },
+        {
+          "op": "constant",
+          "ty": {
+            "kind": "string"
+          },
+          "value": "Room 0000",
+          "span": {
+            "file": "src/main.bfl",
+            "line": 7
+          }
+        },
+        {
+          "op": "offer",
+          "target": 15,
+          "span": {
+            "file": "src/main.bfl",
+            "line": 6
+          }
+        },
+        {
+          "op": "choose",
+          "fallback": null,
+          "span": {
+            "file": "src/main.bfl",
+            "line": 6
+          }
+        },
+        {
+          "op": "enter",
+          "span": {
+            "file": "src/main.bfl",
+            "line": 6
+          }
+        },
+        {
+          "op": "load",
+          "name": "rooms.r0000.enter",
+          "span": {
+            "file": "src/main.bfl",
+            "line": 8
+          }
+        },
+        {
+          "op": "scene_call",
+          "names": [],
+          "direct": true,
+          "transfer": false,
+          "span": {
+            "file": "src/main.bfl",
+            "line": 8
+          }
+        },
+        {
+          "op": "pop",
+          "span": {
+            "file": "src/main.bfl",
+            "line": 8
+          }
+        },
+        {
+          "op": "exit",
+          "span": {
+            "file": "src/main.bfl",
+            "line": 6
+          }
+        },
+        {
+          "op": "jump",
+          "target": 21,
+          "span": {
+            "file": "src/main.bfl",
+            "line": 6
+          }
+        },
+        {
+          "op": "exit",
+          "span": {
+            "file": "src/main.bfl",
+            "line": 4
+          }
+        },
+        {
+          "op": "jump",
+          "target": 23,
+          "span": {
+            "file": "src/main.bfl",
+            "line": 4
+          }
+        },
+        {
+          "op": "prose_start",
+          "span": {
+            "file": "src/main.bfl",
+            "line": 9
+          }
+        },
+        {
+          "op": "enter",
+          "span": {
+            "file": "src/main.bfl",
+            "line": 9
+          }
+        },
+        {
+          "op": "constant",
+          "ty": {
+            "kind": "string"
+          },
+          "value": "Finished ",
+          "span": {
+            "file": "src/main.bfl",
+            "line": 10
+          }
+        },
+        {
+          "op": "load",
+          "name": "stats.visits",
+          "span": {
+            "file": "src/main.bfl",
+            "line": 10
+          }
+        },
+        {
+          "op": "constant",
+          "ty": {
+            "kind": "string"
+          },
+          "value": "",
+          "span": {
+            "file": "src/main.bfl",
+            "line": 10
+          }
+        },
+        {
+          "op": "format",
+          "count": 3,
+          "span": {
+            "file": "src/main.bfl",
+            "line": 10
+          }
+        },
+        {
+          "op": "prose_text",
+          "span": {
+            "file": "src/main.bfl",
+            "line": 10
+          }
+        },
+        {
+          "op": "exit",
+          "span": {
+            "file": "src/main.bfl",
+            "line": 9
+          }
+        },
+        {
+          "op": "prose_end",
+          "span": {
+            "file": "src/main.bfl",
+            "line": 9
+          }
+        },
+        {
+          "op": "constant",
+          "ty": {
+            "kind": "unit"
+          },
+          "value": null,
+          "span": {
+            "file": "src/main.bfl",
+            "line": 3
+          }
+        },
+        {
+          "op": "return",
+          "span": {
+            "file": "src/main.bfl",
+            "line": 3
+          }
+        }
+      ],
+      "init": false,
+      "local": false
+    },
+    "rooms.r0000.enter": {
+      "signature": {
+        "id": "rooms.r0000.enter",
+        "params": [],
+        "result": {
+          "kind": "unit"
+        },
+        "suspend": true,
+        "scene": true
+      },
+      "code": [
+        {
+          "op": "load",
+          "name": "stats.visits",
+          "span": {
+            "file": "src/rooms/r0000.bfl",
+            "line": 3
+          }
+        },
+        {
+          "op": "constant",
+          "ty": {
+            "kind": "int"
+          },
+          "value": 1,
+          "span": {
+            "file": "src/rooms/r0000.bfl",
+            "line": 3
+          }
+        },
+        {
+          "op": "binary",
+          "operator": "+",
+          "span": {
+            "file": "src/rooms/r0000.bfl",
+            "line": 3
+          }
+        },
+        {
+          "op": "store",
+          "name": "stats.visits",
+          "span": {
+            "file": "src/rooms/r0000.bfl",
+            "line": 3
+          }
+        },
+        {
+          "op": "prose_start",
+          "span": {
+            "file": "src/rooms/r0000.bfl",
+            "line": 4
+          }
+        },
+        {
+          "op": "enter",
+          "span": {
+            "file": "src/rooms/r0000.bfl",
+            "line": 4
+          }
+        },
+        {
+          "op": "constant",
+          "ty": {
+            "kind": "string"
+          },
+          "value": "begin0000 x x end0000",
+          "span": {
+            "file": "src/rooms/r0000.bfl",
+            "line": 5
+          }
+        },
+        {
+          "op": "prose_text",
+          "span": {
+            "file": "src/rooms/r0000.bfl",
+            "line": 5
+          }
+        },
+        {
+          "op": "exit",
+          "span": {
+            "file": "src/rooms/r0000.bfl",
+            "line": 4
+          }
+        },
+        {
+          "op": "prose_end",
+          "span": {
+            "file": "src/rooms/r0000.bfl",
+            "line": 4
+          }
+        },
+        {
+          "op": "begin_choice",
+          "span": {
+            "file": "src/rooms/r0000.bfl",
+            "line": 9
+          }
+        },
+        {
+          "op": "constant",
+          "ty": {
+            "kind": "boolean"
+          },
+          "value": true,
+          "span": {
+            "file": "src/rooms/r0000.bfl",
+            "line": 10
+          }
+        },
+        {
+          "op": "jump_false",
+          "target": 19,
+          "span": {
+            "file": "src/rooms/r0000.bfl",
+            "line": 9
+          }
+        },
+        {
+          "op": "constant",
+          "ty": {
+            "kind": "boolean"
+          },
+          "value": true,
+          "span": {
+            "file": "src/rooms/r0000.bfl",
+            "line": 10
+          }
+        },
+        {
+          "op": "constant",
+          "ty": {
+            "kind": "string"
+          },
+          "value": "Return ",
+          "span": {
+            "file": "src/rooms/r0000.bfl",
+            "line": 10
+          }
+        },
+        {
+          "op": "load",
+          "name": "stats.visits",
+          "span": {
+            "file": "src/rooms/r0000.bfl",
+            "line": 10
+          }
+        },
+        {
+          "op": "constant",
+          "ty": {
+            "kind": "string"
+          },
+          "value": "",
+          "span": {
+            "file": "src/rooms/r0000.bfl",
+            "line": 10
+          }
+        },
+        {
+          "op": "format",
+          "count": 3,
+          "span": {
+            "file": "src/rooms/r0000.bfl",
+            "line": 10
+          }
+        },
+        {
+          "op": "offer",
+          "target": 20,
+          "span": {
+            "file": "src/rooms/r0000.bfl",
+            "line": 9
+          }
+        },
+        {
+          "op": "choose",
+          "fallback": null,
+          "span": {
+            "file": "src/rooms/r0000.bfl",
+            "line": 9
+          }
+        },
+        {
+          "op": "enter",
+          "span": {
+            "file": "src/rooms/r0000.bfl",
+            "line": 9
+          }
+        },
+        {
+          "op": "constant",
+          "ty": {
+            "kind": "unit"
+          },
+          "value": null,
+          "span": {
+            "file": "src/rooms/r0000.bfl",
+            "line": 11
+          }
+        },
+        {
+          "op": "pop",
+          "span": {
+            "file": "src/rooms/r0000.bfl",
+            "line": 11
+          }
+        },
+        {
+          "op": "exit",
+          "span": {
+            "file": "src/rooms/r0000.bfl",
+            "line": 9
+          }
+        },
+        {
+          "op": "jump",
+          "target": 25,
+          "span": {
+            "file": "src/rooms/r0000.bfl",
+            "line": 9
+          }
+        },
+        {
+          "op": "constant",
+          "ty": {
+            "kind": "unit"
+          },
+          "value": null,
+          "span": {
+            "file": "src/rooms/r0000.bfl",
+            "line": 2
+          }
+        },
+        {
+          "op": "return",
+          "span": {
+            "file": "src/rooms/r0000.bfl",
+            "line": 2
+          }
+        }
+      ],
+      "init": false,
+      "local": false
+    },
+    "stats.$init": {
+      "signature": {
+        "id": "stats.$init",
+        "params": [],
+        "result": {
+          "kind": "unit"
+        },
+        "suspend": false,
+        "scene": false
+      },
+      "code": [
+        {
+          "op": "load",
+          "name": "stats.visits",
+          "span": {
+            "file": "src/stats.bfl",
+            "line": 1
+          }
+        },
+        {
+          "op": "pop",
+          "span": {
+            "file": "src/stats.bfl",
+            "line": 1
+          }
+        },
+        {
+          "op": "constant",
+          "ty": {
+            "kind": "unit"
+          },
+          "value": null,
+          "span": {
+            "file": "src/stats.bfl",
+            "line": 1
+          }
+        },
+        {
+          "op": "return",
+          "span": {
+            "file": "src/stats.bfl",
+            "line": 1
+          }
+        }
+      ],
+      "init": true,
+      "local": false
+    },
+    "stats.$shared:visits": {
+      "signature": {
+        "id": "stats.$shared:visits",
+        "params": [],
+        "result": {
+          "kind": "int"
+        },
+        "suspend": false,
+        "scene": false
+      },
+      "code": [
+        {
+          "op": "constant",
+          "ty": {
+            "kind": "int"
+          },
+          "value": 0,
+          "span": {
+            "file": "src/stats.bfl",
+            "line": 1
+          }
+        },
+        {
+          "op": "return",
+          "span": {
+            "file": "src/stats.bfl",
+            "line": 1
+          }
+        }
+      ],
+      "init": false,
+      "local": true
+    }
+  },
+  "init": [
+    "stats.$init"
+  ]
+}

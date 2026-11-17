@@ -1,0 +1,11 @@
+import stats.visits
+export scene enter():
+    visits += 1
+    prose:
+        begin0000
+        x
+        x
+        end0000
+    choice:
+        option "Return ${visits}":
+            Unit
