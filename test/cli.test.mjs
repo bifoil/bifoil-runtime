@@ -4,6 +4,8 @@ import { mkdtempSync, readFileSync, writeFileSync, rmSync, existsSync } from "no
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PassThrough } from "node:stream";
+import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { runCli } from "../src/cli.mjs";
 
 function terminal(t, responses = []) {
@@ -98,4 +100,42 @@ test("CLI runs explicit native bridges with supplied state and restores native i
   const invalid = terminal(t);
   assert.equal(await runCli(options, invalid), 1);
   assert.ok(invalid.errors[0].length > 0);
+});
+
+
+test("CLI default terminal dependencies report usage and complete noninteractive stories", async (t) => {
+  const printed = t.mock.method(console, "log", () => {});
+  const errors = t.mock.method(console, "error", () => {});
+  assert.equal(await runCli([]), 1);
+  assert.match(errors.mock.calls[0].arguments[0], /STARTUP/);
+  const { source } = fixture(t);
+  assert.equal(await runCli([source]), 0);
+  assert.deepEqual(printed.mock.calls.map((call) => call.arguments[0]), ["3 sd1d2\n"]);
+  assert.equal(errors.mock.callCount(), 1);
+});
+
+test("CLI entry dispatches only direct invocation, including anonymous module hosts", (t) => {
+  // Source instrumentation adds startup work; keep the ordinary CLI deadline strict.
+  const timeout = process.env.BIFOIL_ISTANBUL_DIRECTORY ? 60000 : 10000;
+  const observer = process.env.BIFOIL_ISTANBUL_DIRECTORY
+    ? ["--import", fileURLToPath(new URL("./coverage-register.mjs", import.meta.url))]
+    : [];
+  const root = fileURLToPath(new URL("../", import.meta.url));
+  const { source } = fixture(t);
+  const direct = spawnSync(process.execPath, [...observer, "src/cli.mjs", source], {
+    cwd: root,
+    encoding: "utf8",
+    timeout,
+  });
+  assert.equal(direct.error, undefined);
+  assert.equal(direct.status, 0, direct.stderr);
+  assert.equal(direct.stdout, "3 sd1d2\n\n");
+  const anonymous = spawnSync(process.execPath, [
+    ...observer, "--input-type=module", "--eval",
+    'await import("./src/cli.mjs"); process.stdout.write("Original anonymous import completed\\n");',
+  ], { cwd: root, encoding: "utf8", timeout });
+  assert.equal(anonymous.error, undefined);
+  assert.equal(anonymous.status, 0, anonymous.stderr);
+  assert.equal(anonymous.stdout, "Original anonymous import completed\n");
+  assert.equal(anonymous.stderr, "");
 });
