@@ -1,4 +1,4 @@
-import { scalarOrder } from "./text.mjs";
+import { scalarOrder, joinText } from "./text.mjs";
 // Checked primitive operators. Heap-aware equality and membership live in RuntimeHeap.
 import { BifoilError, check } from "./errors.mjs";
 import { value, int, float, format, isNumeric as numeric } from "./values.mjs";
@@ -19,7 +19,8 @@ export function binary(operator, a, b) {
     const order = a.kind === "string" ? scalarOrder(a.value, b.value) : Math.sign(a.value - b.value);
     return value("boolean", { "<": order < 0, "<=": order <= 0, ">": order > 0, ">=": order >= 0 }[operator]);
   }
-  if (operator === "+" && (a.kind === "string" || b.kind === "string")) return value("string", format(a) + format(b));
+  if (operator === "+" && (a.kind === "string" || b.kind === "string"))
+    return value("string", joinText([format(a), format(b)]));
   check(numeric(a) && numeric(b), "numeric operands required");
   if (operator === "%+" || operator === "%-") {
     check(a.value >= 0 && a.value <= 100, "fairmath base must be in 0..100");

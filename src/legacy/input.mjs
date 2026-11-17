@@ -1,6 +1,7 @@
 // Native input preparation uses the engine's tokenizer and expression evaluator.
 // Prepared bounds and options are checkpointed; restoring never reevaluates them.
 import { check } from "../errors.mjs";
+import { assertScalarText } from "../text.mjs";
 
 function integerSpelling(value) {
   const parsed = Number.parseInt(value, 10);
@@ -81,6 +82,7 @@ export function validateInput(input) {
     "invalid native input descriptor",
   );
   check(input.feedback === undefined || typeof input.feedback === "string", "invalid native input feedback");
+  if (input.feedback !== undefined) assertScalarText(input.feedback, "native input feedback");
   if (input.kind === "text") check(typeof input.long === "boolean", "invalid native text options");
   else
     check(

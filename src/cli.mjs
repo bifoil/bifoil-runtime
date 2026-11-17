@@ -42,6 +42,11 @@ try {
     while (true) {
       for (const paragraph of result.output) console.log(paragraph + "\n");
       if (result.status === "done") break;
+      if (result.status === "loading") {
+        await result.ready;
+        result = machine.run();
+        continue;
+      }
       if (result.status === "running") {
         await yieldExecution();
         result = machine.run();

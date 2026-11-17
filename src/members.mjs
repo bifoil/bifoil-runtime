@@ -3,7 +3,8 @@ import { stringify } from "./rendering.mjs";
 import { scalarLength, scalarAt, scalarSubstring } from "./text.mjs";
 // Container, object, prose, and control-transfer instructions used by the VM.
 import { BifoilError, check } from "./errors.mjs";
-import { collection, sameType, signatureType, reifyCollectionCopy } from "./types.mjs";
+import { collection, sameType, signatureType } from "./types.mjs";
+import { copyCollection } from "./conversions.mjs";
 import { value, int, nullValue as nil, unit } from "./values.mjs";
 import { RuntimeFrames } from "./frames.mjs";
 
@@ -118,14 +119,17 @@ export class RuntimeMembers extends RuntimeFrames {
         add: ["element"],
         remove: [c?.family === "Map" ? "key" : "element"],
         contains: ["element"],
-        containsKey: ["element"],
+        containsKey: [this.program.profile === "bifoil-vm.v3" ? "key" : "element"],
         insert: ["index", "element"],
         removeAt: ["index"],
         put: ["key", "value"],
       }[callable.name] ?? [];
     const bound = new Array(callable.type.params.length);
     args.forEach((argument, i) => {
-      const index = names[i] === null ? i : parameterNames.indexOf(names[i]);
+      // Earlier compiled bodies used element for containsKey. Keep that stored
+      // interface executable; new source exposes only the checked key name.
+      const legacyKeyName = callable.name === "containsKey" && names[i] === "element";
+      const index = names[i] === null ? i : legacyKeyName ? 0 : parameterNames.indexOf(names[i]);
       check(names[i] === null || direct, "function values require positional arguments");
       check(index >= 0 && index < bound.length && bound[index] === undefined, "invalid builtin argument");
       check(this.acceptsType(callable.type.params[index], this.valueType(argument)), "builtin argument type mismatch");
@@ -179,21 +183,7 @@ export class RuntimeMembers extends RuntimeFrames {
       case "containsKey":
         return value("boolean", this.contains(receiver, a));
     }
-    if (callable.name.startsWith("to") && c) {
-      const target = reifyCollectionCopy(callable.type.result, this.valueType(receiver), this.program.types ?? {}),
-        object = this.object(receiver),
-        t = collection(target);
-      check(t?.family === c.family, "invalid collection copy");
-      if (c.family === "Map")
-        return this.collectionValue(
-          target,
-          object.entries.map(([k, v]) => [this.convert(k, t.args[0]), this.convert(v, t.args[1])]),
-        );
-      return this.collectionValue(
-        target,
-        object.items.map((item) => this.convert(item, t.args[0])),
-      );
-    }
+    if (callable.name.startsWith("to") && c) return copyCollection(this, receiver, callable.type.result);
     check(c?.mutable, "collection method requires a mutable container");
     const object = this.object(receiver);
     switch (callable.name) {

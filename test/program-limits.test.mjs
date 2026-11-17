@@ -34,6 +34,27 @@ test("package loading bounds the combined function table before execution", asyn
   );
 });
 
+test("the package module boundary accepts complete independently valid bodies", async () => {
+  const program = JSON.parse(readFileSync(new URL("./fixtures/checkpoint.json", import.meta.url), "utf8"));
+  const existing = new Set(Object.keys(program.functions).map((id) => id.split(".")[0])).size;
+  const span = { file: "src/module_limits.bfl", line: 1 };
+  for (let index = existing; index < MAX_MODULES; index++) {
+    const id = "boundary_module" + index + ".routine";
+    program.functions[id] = {
+      signature: { id, params: [], result: { kind: "unit" }, suspend: false, scene: false },
+      code: [
+        { op: "constant", ty: { kind: "unit" }, value: null, span },
+        { op: "return", span },
+      ],
+      init: false,
+    };
+  }
+  const data = splitCompiledProgram(program);
+  const loaded = await loadPackage(data.manifest, (name) => data.sources.get(name));
+  assert.equal(Object.keys(loaded.modules).length, MAX_MODULES);
+  assert.equal(Object.keys(loaded.functions).length, Object.keys(program.functions).length);
+});
+
 test("package module inventory is bounded before any companion scene is fetched", async () => {
   const program = JSON.parse(readFileSync(new URL("./fixtures/checkpoint.json", import.meta.url), "utf8"));
   const existing = new Set(Object.keys(program.functions).map((id) => id.split(".")[0])).size;

@@ -9,8 +9,8 @@ essential context for a future independent clone. The user's latest instructions
 
 The first execution layer for compiled Bifoil programs.
 
-The development bifoil-vm.v2 JavaScript runtime executes compiler output through an explicit ChoiceScript extension.
-V1 regression fixtures remain supported.
+The development bifoil-vm.v3 JavaScript runtime executes compiler output through an explicit ChoiceScript extension.
+V1 and v2 regression fixtures remain supported.
 It is not a modified or relicensed copy of the ChoiceScript engine. Read PROTOCOL.md for the versioned interface.
 
 The foundation's broader goal is a FOSS ecosystem comprising a ChoiceScript-compatible superset language, shared

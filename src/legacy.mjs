@@ -1,3 +1,5 @@
+import { assertScalarText } from "./text.mjs";
+import { legacyInstructions, continuationInstruction } from "./program-code.mjs";
 // Explicit typed host boundary. Hosts execute legacy code; this module checks
 // values and preserves the Bifoil continuation at fully prepared input waits.
 import { check, BifoilError, haltExecution } from "./errors.mjs";
@@ -133,7 +135,7 @@ export function callLegacy(machine, instruction, frame) {
 export function chooseLegacy(machine, index) {
   const pending = machine.state.pending;
   const frame = machine.state.frames.at(-1);
-  const instruction = machine.program.functions[frame.function].code[frame.pc - 1];
+  const instruction = continuationInstruction(machine.program, frame.function, frame.pc - 1);
   machine.span = instruction.span;
   try {
     const reply = invoke(
@@ -153,8 +155,8 @@ const legacyInterfaces = new WeakMap();
 function hasLegacyInterfaces(program) {
   if (!legacyInterfaces.has(program)) {
     const globals = Object.keys(program.legacy_globals ?? {}).length > 0;
-    const calls = Object.values(program.functions).some((fn) =>
-      fn.code.some((instruction) => instruction.op === "legacy_call"),
+    const calls = Object.keys(program.functions).some((id) =>
+      legacyInstructions(program, id).some((instruction) => instruction.op === "legacy_call"),
     );
     legacyInterfaces.set(program, globals || calls);
   }
@@ -175,10 +177,10 @@ export function restoreLegacyHost(machine) {
 }
 export function validateLegacyOptions(options) {
   check(Array.isArray(options) && options.length <= 10000, "invalid legacy choice options");
-  check(
-    options.every((option) => option && typeof option.label === "string" && typeof option.enabled === "boolean"),
-    "invalid legacy option",
-  );
+  for (const option of options) {
+    check(option && typeof option.label === "string" && typeof option.enabled === "boolean", "invalid legacy option");
+    assertScalarText(option.label, "legacy option label");
+  }
 }
 export function validateLegacyProgram(program) {
   check(
@@ -203,7 +205,7 @@ export function validateLegacyProgram(program) {
     "invalid legacy sources",
   );
   for (const fn of Object.values(program.functions))
-    for (const instruction of fn.code) {
+    for (const instruction of legacyInstructions(program, fn.signature.id)) {
       if (instruction.op !== "legacy_call") continue;
       const target = instruction.target;
       check(

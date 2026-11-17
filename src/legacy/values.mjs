@@ -1,4 +1,4 @@
-import { isSingleScalar } from "../text.mjs";
+import { isSingleScalar, assertScalarText } from "../text.mjs";
 // Checked native representations shared by state and subroutine bridges.
 import { check } from "../errors.mjs";
 import { value, int, float, nullValue, unit, isScalarString } from "../values.mjs";
@@ -62,7 +62,7 @@ export function fromLegacy(raw, type, machine = null) {
     return value("boolean", raw);
   }
   if (type.kind === "string" || type.kind === "char") {
-    check(isScalarString(raw), "legacy text is not a Unicode scalar String");
+    assertScalarText(raw, "legacy text is not a Unicode scalar String");
     check(type.kind !== "char" || isSingleScalar(raw), "legacy value is not one Char");
     return value(type.kind, raw);
   }

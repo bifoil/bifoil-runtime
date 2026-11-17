@@ -1,12 +1,16 @@
 # Bifoil instruction interfaces
 
-The compiler currently emits the development `bifoil-vm.v2` profile. The runtime retains the v1 compatibility profile
-described below for its original regression fixtures. Full language conformance is unfinished; v2 remains a development
-interface.
+The compiler currently emits the development `bifoil-vm.v3` profile. The runtime retains v1/v2 execution for original
+regression fixtures and compatible compiled programs. Full language conformance remains unfinished.
 
-## Development profile v2
+The [compatibility and producer contract](../bifoil-language/compatibility-contract.md) defines the exact supported
+format/profile pairs, cache versus module-producer identity, package build identities, and rejection order. Program v1
+requires profile v1; program v2 supports profile v2 or v3. Checkpoint v2 envelopes retain the exact program profile;
+checkpoint v1 envelopes remain limited to profile v1 and the same compiled build.
 
-Module and program formats use `bifoil.module.v3` and `bifoil.program.v2`. The surrounding digest, dependency, function,
+## Development profile v3
+
+Module and program formats use `bifoil.module.v6` and `bifoil.program.v2`. The surrounding digest, dependency, function,
 and source-span conventions are retained. Modules and linked programs additionally contain nominal `types` definitions,
 with parameters, ordered field names, field types/mutability/visibility, method signatures, parent types, and closed
 variants.
@@ -18,10 +22,11 @@ fingerprint, each member temporarily clears its own digest, group descriptor, an
 fingerprint hashes the sorted name-to-member-hash map. Mixed group revisions require recompilation. Acyclic modules
 retain their previous encoding.
 
-Module v3 requires the compiler's ordered operand checks. Earlier module artifacts must be regenerated from source;
-linking an earlier lowered body cannot establish those checks. This changes compiler artifact compatibility, while
-retaining the VM v2 instruction/profile contract. Canonical hashing and bounded atomic JSON writes still stream through
-writers, rather than materializing a complete serialized copy.
+Module v4 requires ordered operand checks, integer membership checking, and progression-view lowering. Earlier module
+artifacts must be regenerated from source; linking an earlier lowered body cannot establish those checks. This changes
+compiler artifact compatibility, while retaining the module container structure. Profile v3 additionally requires
+declared comparison views for exact equality. Canonical hashing and bounded atomic JSON writes still stream through
+writers rather than materializing a complete serialized copy.
 
 Export interfaces include functions, overload sets, globals, nominal types with any generated constructor, and
 transparent aliases. A single function uses the existing `function` export tag; a set uses `functions` with a
@@ -112,19 +117,20 @@ retain their ordinary evaluation order; hosts schedule another run. Only a fully
 
 ## Code package extension
 
-`bifoil.package.v1` is an optional output layout for `bifoil-vm.v2`. Independently compiled module artifacts keep their
-`bifoil.module.v3` representation. A package root carries the ordinary linked-program metadata, an empty
-`functions` object, and `chunks`, keyed by module name:
+Eager `bifoil.package.v1` remains a compatibility output layout for the supported v2/v3 profiles. Independently compiled
+module artifacts keep their `bifoil.module.v6` representation. A package root carries the ordinary linked-program
+metadata, an empty `functions` object, and `chunks`, keyed by module name:
 
 ```json
 {"scene": "bifoil_code_<sha256>", "module_digest": "<module identity>"}
 ```
 
 Each `module_digest` equals the corresponding root `modules` value. Every module has exactly one chunk. The current
-inventory guard is 512 modules. A code scene contains one `*bifoil_module` command whose compact JSON has `format:
-"bifoil.code.v1"`, `profile: "bifoil-vm.v2"`, its dotted `module`, and its `functions` map. Its exact UTF-8 JSON payload
-bytes, excluding the command prefix and surrounding scene text, determine the lowercase SHA-256 filename. Consumers hash
-those bytes directly; parsing and reserializing can change Float spellings and is not equivalent.
+inventory guard is 1,024 modules. A code scene contains one `*bifoil_module` command whose compact JSON has `format:
+"bifoil.code.v1"`, the exact instruction profile of its root, its dotted `module`, and its `functions` map. Its exact
+UTF-8 JSON payload bytes, excluding the command prefix and surrounding scene text, determine the lowercase SHA-256
+filename. Consumers hash those bytes directly; parsing and reserializing can change Float spellings and is not
+equivalent.
 
 The generated scene ends with `*return`. The root calls each code scene using `*gosub_scene`, then executes one
 `*bifoil` command with its manifest. The adapter stages chunks in a WeakMap owned by that story's stats object and
@@ -143,6 +149,31 @@ permits 81,920 functions and 500,000 instructions. Programs above 16,384 functio
 require the expanded runtime capacity. Filesystem scene inputs are bounded at 16 MiB of UTF-8 bytes and decoded
 incrementally; portable in-memory inputs retain their string-size guard. This is an eager loader and does not establish
 the eventual large-project capacity.
+
+### On-demand package v2
+
+`bifoil.package.v2` supports v2/v3 instruction profiles and v1 code chunks, with a root `function_headers` map in
+addition to `chunks`. The root has one `*bifoil` command and no eager native scene calls. Headers retain checked
+signatures, owning modules, init/local flags, body lengths, continuation positions, and named capture sites. Metadata
+remains resident; bodies are fetched and verified on demand and may be evicted.
+
+Every fetched module must exactly match its declared header inventory before any of its code executes. Unused modules
+are not read. An evicted body is read and checked again before execution resumes at the saved PC. The default cache is
+four modules and 32 MiB of JSON payload weight; one current body is additionally retained per VM. This cache policy is
+distinct from physical memory measurement and target-scale acceptance.
+
+`VM.run()` adds a non-saveable `loading` result containing `ready` and completed output. Await `ready` and run again, or
+use `VM.runAsync()` to handle code waits through the next ordinary execution result. Code waits preserve operands,
+frames, partial calls, defaults, and source diagnostics. A failure remains terminal and leaves earlier output drainable
+once. Neither code waits nor ordinary quantum yields are player-input checkpoints.
+
+Restore checks PCs, loop marks, prepared choices, native continuations, and captured identities against the header
+metadata. It does not need to fetch all active callers. Bodies and cache state are excluded from saves, and completed
+evaluation is never replayed. Build identity includes the complete header/chunk inventory; cross-build/layout restores
+remain invalid. An older runtime must reject a v2 package it cannot support. Module artifacts remain v3.
+
+[On-demand compiled code](LAZY_PACKAGES.md) defines the complete header schema, verification order, transports,
+lifetime, and host API. Eager v1 and inline compatibility remain independently validated.
 
 ## Typed legacy extension in v2
 
@@ -189,6 +220,10 @@ native access. Snapshotting does not execute a bridge or read a declared native 
 before later native access. Hostless programs with unused interfaces retain their existing checkpoint behavior.
 
 ## V1 compatibility profile
+
+The following section records the original representation and execution behavior. The current runtime retains its
+program/checkpoint reader paths; the current compiler requires module v6 and rejects original module artifacts. New
+source compilation targets profile v3. This historical section does not override the supported combination matrix.
 
 This document describes the implemented compiler/runtime boundary for `bifoil-vm.v1`. It is a restricted implementation
 profile, not a replacement for the full Bifoil language design. Breaking changes require a new profile/version.
@@ -298,3 +333,54 @@ compacts unreachable heap graphs. Save migration across builds remains unimpleme
 The original compiled fixtures exercise source-free module linkage, named/default interfaces, partial expressions,
 shared mutable captures, choice snapshots, escaping function references, checked numeric failures, and source spans. The
 optional engine test uses the unmodified pinned dispatcher. It is separate from full browser save-host validation.
+
+
+## V3 exact comparison instructions
+
+exact_compare carries left_type, right_type, and negate. Types use the ordinary serialized type grammar; negate is a
+required Boolean. Pop the right operand, then the left. Resolve both views using the active frame's retained generic
+arguments, compare without scalar widening or container copying, and push one Boolean, negated when requested. The
+compiler captures each static operand view at its evaluation point, preserving left-to-right flow checks.
+
+Nullable wrappers do not distinguish present values; two nulls compare equal. Primitive kinds remain exact. Composite
+comparison views must match, then their declared fields/elements/entries supply child views. Different active sealed
+variants remain unequal. Unknown positions retain actual value identities rather than making unlike primitive kinds
+equal. Static equality eligibility remains a producer obligation.
+
+The traversal owns iterative frames and a rollback trail for unordered candidates. Pair memoization includes the
+comparison view: a proof through a broad covariant view cannot discharge a later comparison through a hidden view. No
+operand or heap object is rewritten. Views in reloaded code and generic frame arguments preserve this behavior after
+suspension and same-build restoration without replay. Program/profile v1/v2 bodies retain their prior binary
+exact-equality instructions; profile v3 requires exact_compare instead.
+
+
+## Prose contexts and explicit line breaks
+
+Prose-mode callable bodies use existing prose_start/prose_end instructions and return unwinding to own their output.
+Their text remains valid after escaping its defining narrative or suspending at input. VM transcripts and custom print
+hooks retain real newlines. Default presentation maps LF, CRLF, and CR to visible inline native line breaks without
+native variable interpolation. These repairs require no instruction/container version change.
+
+## Typed text admission
+
+The development runtime limits a typed String or assembled text result to 16,777,216 UTF-16 storage units. This is a
+runtime admission guard; String operations retain scalar-based language indexes. Size checks precede external scalar
+scans and combined-result joins. Invalid scalar diagnostics identify scalar and storage positions without rejected
+contents. Typed legacy reads, host output/labels/feedback, submitted text, and restored presentation text are checked.
+Invalid submitted text leaves its prepared input wait reusable and does not call the native host. Invalid host output
+is terminal while preserving earlier completed output once. These checks do not constrain allocations already made by
+an external host or establish aggregate compiler/runtime capacity.
+[Text semantics](../bifoil-language/text-semantics.md)
+and [admission tests](test/text-admission.test.mjs) record the complete boundary.
+
+The complete current [v3 instruction contract](INSTRUCTIONS.md) specifies every opcode payload, typed operand shape,
+source span, state effect, transfer, and suspension obligation. Historical v1 tables remain unchanged.
+
+## Generic producer obligation in module v6
+
+Reusable modules now require v6: preserve supplied, bound-valid generic arguments when their result already satisfies
+the expected type by genuine subtyping. Context may fill missing arguments before that proof. Earlier module bodies
+can retain different construction identities, so consumers require source regeneration rather than relabeling. The
+instruction profile remains v3; no runtime opcode, program, package, code-chunk, or checkpoint schema changes.
+The [compatibility contract](../bifoil-language/compatibility-contract.md#retained-generic-inference-in-module-v6)
+defines the producer boundary.

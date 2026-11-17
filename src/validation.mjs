@@ -1,4 +1,6 @@
-import { validScalarOffset } from "./text.mjs";
+import { checkpointVersionSupported } from "./compatibility.mjs";
+import { functionLength, continuationInstruction, stackMarkExists } from "./program-code.mjs";
+import { validScalarOffset, assertScalarText } from "./text.mjs";
 import { isScalarString } from "./values.mjs";
 import { validateInput } from "./legacy/input.mjs";
 import { validateLegacyOptions, saveLegacyHost, copyJson } from "./legacy.mjs";
@@ -18,20 +20,18 @@ export function validateOptions(machine, options, frame) {
         typeof o.enabled === "boolean" &&
         Number.isInteger(o.target) &&
         o.target >= 0 &&
-        o.target < machine.program.functions[frame.function].code.length &&
+        o.target < functionLength(machine.program, frame.function) &&
         (o.once === undefined || o.once === null || typeof o.once === "string"),
       "invalid choice option",
     ),
   );
+  for (const option of options) assertScalarText(option.label, "choice label");
 }
 
 export function validateCheckpoint(machine) {
   const s = machine.state;
   check(
-    s &&
-      ["bifoil.checkpoint.v1", "bifoil.checkpoint.v2"].includes(s.format) &&
-      s.profile === machine.program.profile &&
-      s.build === machine.program.build,
+    checkpointVersionSupported(s) && s.profile === machine.program.profile && s.build === machine.program.build,
     "checkpoint belongs to a different build or profile",
   );
   check(
@@ -45,6 +45,7 @@ export function validateCheckpoint(machine) {
     "invalid checkpoint heap",
   );
   check(Array.isArray(s.prose) && s.prose.every((text) => typeof text === "string"), "invalid prose buffers");
+  for (const text of s.prose) assertScalarText(text, "prose buffer");
   s.cells.forEach((c) =>
     check(
       c &&
@@ -105,7 +106,7 @@ export function validateCheckpoint(machine) {
         Object.hasOwn(machine.program.functions, f.function) &&
         Number.isInteger(f.pc) &&
         f.pc >= 0 &&
-        f.pc < machine.program.functions[f.function].code.length &&
+        f.pc < functionLength(machine.program, f.function) &&
         Number.isInteger(f.env) &&
         f.env >= 0 &&
         f.env < s.envs.length &&
@@ -131,7 +132,7 @@ export function validateCheckpoint(machine) {
           Number.isInteger(mark.depth) &&
           mark.depth >= depth &&
           mark.depth <= f.stack.length &&
-          machine.program.functions[f.function].code.some((op) => op.op === "stack_mark" && op.id === mark.id),
+          stackMarkExists(machine.program, f.function, mark.id),
         "invalid saved loop stack mark",
       );
       identifiers.add(mark.id);
@@ -171,7 +172,7 @@ export function validateCheckpoint(machine) {
   const frame = s.frames.at(-1);
   if (s.pending.kind === "legacy") {
     check(
-      machine.program.functions[frame.function].code[frame.pc - 1]?.op === "legacy_call" &&
+      continuationInstruction(machine.program, frame.function, frame.pc - 1)?.op === "legacy_call" &&
         machine.program.functions[frame.function].signature.suspend &&
         s.legacyUsed,
       "invalid legacy input continuation",
@@ -184,7 +185,7 @@ export function validateCheckpoint(machine) {
     copyJson(s.pending.continuation);
   } else {
     check(
-      machine.program.functions[frame.function].code[frame.pc - 1]?.op === "choose",
+      continuationInstruction(machine.program, frame.function, frame.pc - 1)?.op === "choose",
       "checkpoint has no waiting choice",
     );
     validateOptions(machine, s.pending.options, frame);
@@ -194,6 +195,7 @@ export function validateCheckpoint(machine) {
     );
   }
   check(Array.isArray(s.transcript) && s.transcript.every((x) => typeof x === "string"), "invalid transcript");
+  for (const text of s.transcript) assertScalarText(text, "transcript text");
   check(
     s.history &&
       typeof s.history === "object" &&

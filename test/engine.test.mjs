@@ -77,3 +77,30 @@ test(
     assert.deepEqual(output, ["Result 12; counter 2; next 3; after 3."]);
   },
 );
+
+test("unmodified ChoiceScript dispatches lazy packages without eager scene execution", { skip: !engine }, async () => {
+  const context = vm.createContext({ trim: (text) => text.trim() });
+  vm.runInContext(readFileSync(engine, "utf8"), context, { filename: "upstream-scene.js" });
+  const { Scene } = context;
+  const program = JSON.parse(readFileSync(new URL("./fixtures/checkpoint.json", import.meta.url), "utf8"));
+  const data = splitCompiledProgram(program, { lazy: true }),
+    reads = [],
+    output = [];
+  let choose;
+  installChoiceScript(Scene, {
+    readChunk: (_scene, name) => {
+      reads.push(name);
+      return data.sources.get(name);
+    },
+    print: (_scene, text) => output.push(text),
+    renderChoice: (_scene, _options, select) => {
+      choose = select;
+    },
+  });
+  const scene = new Scene("startup", {}, {});
+  assert.equal(scene.runCommand("*bifoil " + JSON.stringify(data.manifest)), true);
+  await scene.bifoilLoading;
+  assert.equal(new Set(reads).size, 2);
+  choose(0);
+  assert.deepEqual(output, ["Result 12; counter 2; next 3; after 3."]);
+});

@@ -2,6 +2,46 @@
 // Inputs have already passed the primitive String validation boundary.
 import { check } from "./errors.mjs";
 
+// A development admission guard over UTF-16 storage, separate from scalar
+// indexes and from the compiler's aggregate memory contract. Check before
+// traversing external text or allocating a combined result.
+export const MAX_TEXT_UNITS = 16 * 1024 * 1024;
+
+export function textIssue(text) {
+  if (typeof text !== "string") return "text must be a String";
+  if (text.length > MAX_TEXT_UNITS) return "text size budget exceeded";
+  let scalar = 0;
+  for (let offset = 0; offset < text.length; offset++, scalar++) {
+    const unit = text.charCodeAt(offset);
+    if (unit < 0xd800 || unit > 0xdfff) continue;
+    if (unit <= 0xdbff && offset + 1 < text.length) {
+      const next = text.charCodeAt(offset + 1);
+      if (next >= 0xdc00 && next <= 0xdfff) {
+        offset++;
+        continue;
+      }
+    }
+    return "unpaired surrogate at scalar index " + scalar + " (UTF-16 offset " + offset + ")";
+  }
+  return null;
+}
+
+export function assertScalarText(text, context = "text") {
+  const issue = textIssue(text);
+  check(issue === null, context + ": " + issue);
+  return text;
+}
+
+export function joinText(parts, separator = "") {
+  let length = 0;
+  for (let index = 0; index < parts.length; index++) {
+    check(typeof parts[index] === "string", "invalid text segment");
+    length += parts[index].length + (index > 0 ? separator.length : 0);
+    check(length <= MAX_TEXT_UNITS, "text size budget exceeded");
+  }
+  return parts.join(separator);
+}
+
 export function isSingleScalar(text) {
   if (typeof text !== "string" || text.length === 0) return false;
   const point = text.codePointAt(0);

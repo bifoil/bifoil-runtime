@@ -22,6 +22,11 @@ try {
   result = machine.run();
   let index = 0;
   while (result.status !== "done") {
+    if (result.status === "loading") {
+      await result.ready;
+      result = machine.run();
+      continue;
+    }
     if (result.status === "running") {
       result = machine.run();
       continue;

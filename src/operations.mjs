@@ -1,4 +1,5 @@
 import { findKey } from "./collection-index.mjs";
+import { joinText } from "./text.mjs";
 // Execute heap and story instructions. Return false when the VM must handle a core stack instruction.
 import { BifoilError, check } from "./errors.mjs";
 import { collection } from "./types.mjs";
@@ -73,7 +74,10 @@ export function executeInstruction(machine, instruction, frame, pop) {
       const text = pop();
       check(text.kind === "string" && machine.state.prose.length, "invalid prose text");
       const index = machine.state.prose.length - 1;
-      machine.state.prose[index] += (machine.state.prose[index].length ? " " : "") + text.value;
+      machine.state.prose[index] = joinText(
+        [machine.state.prose[index], text.value],
+        machine.state.prose[index].length ? " " : "",
+      );
       break;
     }
     case "prose_flush":

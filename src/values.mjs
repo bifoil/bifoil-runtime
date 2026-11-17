@@ -1,4 +1,5 @@
 import { check } from "./errors.mjs";
+import { textIssue } from "./text.mjs";
 
 export const INT_MIN = -2147483648;
 export const INT_MAX = 2147483647;
@@ -27,10 +28,5 @@ export function format(item) {
 }
 
 export function isScalarString(text) {
-  if (typeof text !== "string") return false;
-  for (const character of text) {
-    const scalar = character.codePointAt(0);
-    if (scalar >= 0xd800 && scalar <= 0xdfff) return false;
-  }
-  return true;
+  return textIssue(text) === null;
 }

@@ -18,6 +18,8 @@ export function haltExecution(machine, failure) {
     failure instanceof BifoilError && failure.span ? failure : new BifoilError(failure.message, machine.span);
   machine.failure = error;
   machine.state.failed = true;
+  machine.activeCode = null;
+  machine.loading = null;
   machine.state.pending = null;
   // Release host-owned continuations; cleanup cannot mask the original failure.
   try {

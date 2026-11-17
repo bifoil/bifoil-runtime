@@ -3,7 +3,7 @@
 The development execution layer for compiled Bifoil programs, maintained by **chinay** for the Bifoil Foundation.
 
 This JavaScript runtime executes versioned instructions through an explicit ChoiceScript extension. The current
-development profile is `bifoil-vm.v2`; original v1 regression fixtures remain supported. It executes compiled
+development profile is `bifoil-vm.v3`; original v1 and v2 regression fixtures remain supported. It executes compiled
 instructions and does not parse Bifoil source.
 
 Full language conformance, complete browser/save-host acceptance, and releases remain unfinished. See the
@@ -31,6 +31,10 @@ compared against the engine's operators. This does not establish full browser/sa
 Read [ARCHITECTURE.md](ARCHITECTURE.md) for module responsibilities, runtime state, and maintenance guidance. Formatting
 uses the checked-in 120-column Prettier configuration with other defaults.
 
+Read the [compatibility contract](../bifoil-language/compatibility-contract.md) for supported version pairs and
+producer requirements. A valid format name and a valid profile name cannot be combined arbitrarily. Original v1
+programs remain readable and receive v2 checkpoint envelopes that retain their original execution profile.
+
 ## Execute compiler output
 
 Obtain `startup.txt` from a compiler supporting the [instruction interface](PROTOCOL.md):
@@ -46,25 +50,29 @@ earlier evaluation or output. A retained transcript is available for hosts that 
 
 ## Compiled code packages
 
-The terminal automatically recognizes `bifoil.package.v1` roots and reads their sibling content-addressed code scenes.
-Keep every scene named in the root beside `startup.txt`. Terminal reads use a 64 KiB buffer, enforce the 16 MiB scene
-byte limit before and during reading, and reject malformed UTF-8. Each chunk is checked against the SHA-256 in its
-filename before any story instruction runs. Packages are trusted compiler output; these checks detect damage and
-mismatches and do not authenticate a publisher.
+The terminal recognizes on-demand `bifoil.package.v2` roots and eager v1 compatibility roots. Keep every named
+content-addressed code scene beside `startup.txt`. Version 2 starts from checked declaration/continuation metadata and
+fetches instruction bodies when execution reaches them. Its default cache retains at most four modules and 32 MiB of
+JSON payload weight, with a separate current-function handle per VM. Evicted callers resume at their retained PCs.
 
-The ChoiceScript adapter also registers `*bifoil_module`. The generated root loads these scenes through the unchanged
-engine's `*gosub_scene` dispatcher, then starts `*bifoil`. Browser verification uses Web Crypto, which requires a
-suitable secure context, or a host-supplied asynchronous `digest(json)` hook returning lowercase SHA-256 hex. Package
-startup is asynchronous; `scene.bifoilLoading` exposes its completion promise on the scene that executes `*bifoil`. The
-host must wait before interacting with a machine. Loading failures appear in `scene.bifoilFailure` and the ordinary
-error hook. Detaching, restoring, or replacing that session prevents an obsolete load from attaching later.
+Filesystem and browser transports enforce a 16 MiB scene byte limit and reject malformed UTF-8. Every fetched module's
+raw JSON hash, ownership, signatures, continuation/capture summaries, and instructions are checked before its code
+executes. Unused code is not fetched. Packages remain trusted compiler output; hashes establish integrity rather than
+publisher authentication.
 
-For a custom loader, import `loadCompiledProgram(source, readChunk, options)` from `src/packages.mjs`. `source` is the
-root text; `readChunk(sceneName)` asynchronously returns the named scene's text. Use the returned assembled program with
-`VM` or `adapter.restore`. Same-build validation and checkpoint semantics remain unchanged. Loading currently assembles
-all decoded code before execution; lazy module loading is unfinished. The current loader permits 81,920 functions and
-500,000 aggregate instructions, with at most 16,384 functions and 100,000 instructions in any code module. Programs
-exceeding an individual scene file's 16 MiB limit require packages.
+For a custom loader, use `loadCompiledProgram(rootSource, readChunk, options)` from `src/packages.mjs`. Low-level
+`VM.run()` may return `loading` with a `ready` promise; await it before running again. `VM.runAsync()` handles these
+code waits until the next instruction yield, prepared player-input wait, or completion. Only prepared input is saveable.
+The terminal, conformance executor, and ChoiceScript adapter handle code waits directly.
+
+The ChoiceScript adapter reads v2 code beneath `Scene.baseUrl`, or through an asynchronous `readChunk(scene, name)`
+hook.
+Browser hashing uses Web Crypto or the existing digest hook. Old v1 roots still use `*gosub_scene` and `*bifoil_module`
+registration. Obsolete asynchronous completions cannot resume detached or replaced sessions.
+
+See [on-demand compiled code](LAZY_PACKAGES.md) for versioning, cache options, host APIs, restoration, and evidence.
+Metadata and the existing admission guards remain resident; this does not establish target-scale source capacity or
+strict compiler resource compliance.
 
 ## Execution state
 
@@ -82,6 +90,11 @@ Shared initialization follows the compiled dependency plan and completes before 
 start another initializer. Startup metadata and checkpoints reject incomplete initialization. A tracing collector
 reclaims unreachable cells, environments, and objects at instruction boundaries while preserving aliases, cycles, active
 operands, bound receivers, and traversal snapshots.
+
+Collection conversions and explicit copies share an iterative evaluator; they preserve projected identities and shallow
+aliases without expanding container depth onto the host call stack. See [value operation controls](VALUE_OPERATIONS.md).
+Independent [runtime capacity controls](CAPACITY_TESTS.md) exercise active allocation, call-depth boundaries,
+long execution, collector pressure, and large checkpoints separately from compiler source-volume workloads.
 
 These are implemented paths with regression coverage. They do not establish complete type-system or steering
 conformance. The development compiler's limitations still apply.
@@ -130,6 +143,8 @@ Open the printed loopback URL. The toolbar saves prepared checkpoints in local s
 fixture before starting new story execution. This harness does not test a platform's native save UI or billing. Its
 fixture sources are original; `tools/regenerate-fixtures.py --help` describes regeneration with an explicit compiler.
 Browser evidence belongs under ignored `output/playwright/`.
+The [browser acceptance procedure](BROWSER_ACCEPTANCE.md) records fixture assertions, the separate presentation-save
+contract, cold package restoration, and evidence requirements.
 
 Real Chrome acceptance for the original native-output fixture verified text/image/chart order using the unchanged engine
 and its stylesheet. Saved native and typed input waits retained rendered history across fresh-page reloads while the
@@ -224,3 +239,13 @@ The headless native host loads an explicitly supplied trusted ChoiceScript JavaS
 Its VM context isolates engine globals; the caller owns the trust decision for that engine installation. Story prose,
 player responses, and checkpoint contents are handled as data. The browser acceptance server serves approved routes
 on loopback; its engine and package roots are selected by the operator.
+
+[Text admission](../bifoil-language/text-semantics.md#scalar-validation-and-limits) bounds individual typed Strings and
+combined text results in the development runtime, with scalar/storage diagnostics and recoverable input API rejection.
+It does not establish aggregate resource or project-scale acceptance.
+
+The [native command inventory](native-command-profile.json) and [legacy compatibility
+contract](../bifoil-language/legacy-compatibility.md) enumerate the pinned engine commands and explicit bridge limits.
+
+[Instruction contracts](INSTRUCTIONS.md) enumerate the complete current v3 opcode interface and its typed operands,
+state effects, source attribution, and continuation ownership.

@@ -1,0 +1,112 @@
+{
+  "format": "bifoil.native-command-profile.v1",
+  "engine_revision": "60a6c3ee7393c9ee7e42650b8e1642ae38e3cb6a",
+  "engine_sha256": "68e6cced289b819de8e45ba68431ba60c409c048f4e99b41aa9f0780a1c499fb",
+  "source_contract": "Scene.validCommands in web/scene.js; command presence is distinct from host acceptance.",
+  "groups": [
+    {
+      "id": "engine-core",
+      "contract": "Delegated to the unchanged engine; ordinary native data/control semantics.",
+      "commands": [
+        "comment",
+        "goto",
+        "gotoref",
+        "label",
+        "looplimit",
+        "create",
+        "create_array",
+        "temp",
+        "temp_array",
+        "delete",
+        "delete_array",
+        "set",
+        "setref",
+        "print",
+        "if",
+        "else",
+        "elseif",
+        "elsif",
+        "rand",
+        "gosub",
+        "gosub_scene",
+        "return",
+        "params",
+        "hide_reuse",
+        "disable_reuse",
+        "allow_reuse"
+      ]
+    },
+    {
+      "id": "prepared-input",
+      "contract": "Adapter-owned prepared waits; suspension permission, checkpoint restoration, and no replay are required.",
+      "commands": ["choice", "fake_choice", "page_break", "input_text", "input_number"]
+    },
+    {
+      "id": "transfer-boundary",
+      "contract": "Explicit transfer bridges only; ordinary bridges reject replacement or termination before its destination executes.",
+      "commands": ["goto_scene", "finish", "ending", "abort"]
+    },
+    {
+      "id": "host-rendering",
+      "contract": "Requires the engine host renderer. Paragraph ordering is checked for image/stat_chart/line_break; other renderers need host-specific acceptance.",
+      "commands": [
+        "image",
+        "text_image",
+        "stat_chart",
+        "line_break",
+        "sound",
+        "youtube",
+        "kindle_image",
+        "kindle_search",
+        "kindle_product",
+        "link",
+        "link_button"
+      ]
+    },
+    {
+      "id": "startup-metadata",
+      "contract": "Upstream startup rules still apply. The typed adapter does not run a complete native startup or synthesize these host services.",
+      "commands": ["achievement", "author", "ifid", "product", "scene_list", "title"]
+    },
+    {
+      "id": "platform-lifecycle",
+      "contract": "Outside the built-in prepared-continuation profile. Browser globals may execute upstream behavior, but callbacks, external services, persistence, and replacement lifetimes are not integrated or claimed supported.",
+      "commands": [
+        "advertisement",
+        "achieve",
+        "ai",
+        "bug",
+        "check_achievements",
+        "check_purchase",
+        "check_registration",
+        "config",
+        "delay_break",
+        "delay_ending",
+        "end_trial",
+        "feedback",
+        "finish_advertisement",
+        "goto_random_scene",
+        "login",
+        "more_games",
+        "page_break_advertisement",
+        "print_discount",
+        "purchase",
+        "purchase_discount",
+        "redirect_scene",
+        "reset",
+        "restart",
+        "restore_checkpoint",
+        "restore_game",
+        "restore_purchases",
+        "save_checkpoint",
+        "save_game",
+        "script",
+        "share_this_game",
+        "show_password",
+        "subscribe",
+        "timer",
+        "track_event"
+      ]
+    }
+  ]
+}

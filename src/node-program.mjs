@@ -34,9 +34,10 @@ async function readScene(path) {
   }
 }
 
-export async function readCompiledProgram(path) {
+export async function readCompiledProgram(path, options = {}) {
   const source = await readScene(path);
   return loadCompiledProgram(source, (scene) => readScene(join(dirname(path), scene + ".txt")), {
+    ...options,
     digest: (json) => createHash("sha256").update(json, "utf8").digest("hex"),
   });
 }

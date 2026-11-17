@@ -1,20 +1,12 @@
 import { findKey } from "./collection-index.mjs";
+import { convertValue } from "./conversions.mjs";
 import { rootFunction } from "./functions.mjs";
 import { functionValueType, validFunctionValue } from "./callable-values.mjs";
 import { structuralEqual } from "./equality.mjs";
 import { isSingleScalar } from "./text.mjs";
 // Heap values, lexical environments, captured cells, and call-frame argument binding.
 import { BifoilError, check } from "./errors.mjs";
-import {
-  collection,
-  sameType,
-  subtype,
-  signatureType,
-  typeValid,
-  present,
-  substitute,
-  reifyCollectionCopy,
-} from "./types.mjs";
+import { collection, sameType, subtype, signatureType, typeValid, present, substitute } from "./types.mjs";
 import { value as primitive, nullValue, isScalarString as scalarString } from "./values.mjs";
 import { binary as primitiveBinary } from "./numeric.mjs";
 
@@ -144,40 +136,17 @@ export class RuntimeHeap {
     return this.allocateObject({ kind, type, ...(kind === "map" ? { entries: values } : { items: values }) });
   }
   convert(v, type) {
-    type = this.resolveType(type);
-    if (this.acceptsType(type, this.valueType(v))) return v;
-    if (type.kind === "nullable") {
-      if (v.kind === "null") return v;
-      return this.convert(v, type.inner);
-    }
-    if (type.kind === "float" && v.kind === "int") return primitive("float", v.value);
-    if (type.kind === "string" && v.kind === "char") return primitive("string", v.value);
-    const source = collection(this.valueType(v));
-    check(collection(type) && source && collection(type).family === source.family, "unsupported value conversion");
-    type = reifyCollectionCopy(type, this.valueType(v), this.program.types ?? {});
-    const target = collection(type);
-    check(target.mutable !== source.mutable || !target.mutable, "mutable type arguments are invariant");
-    const original = this.object(v);
-    if (target.family === "Map") {
-      const entries = [];
-      const builder = { kind: "map", entries };
-      for (const [key, value] of original.entries) {
-        const converted = this.convert(key, target.args[0]);
-        check(findKey(this, builder, converted) < 0, "conversion produced a duplicate map key");
-        entries.push([converted, this.convert(value, target.args[1])]);
-      }
-      return this.collectionValue(type, entries);
-    }
-    const items = original.items.map((item) => this.convert(item, target.args[0]));
-    if (target.family !== "Set") return this.collectionValue(type, items);
-    const unique = { kind: "set", items: [] };
-    for (const item of items) {
-      if (findKey(this, unique, item) < 0) unique.items.push(item);
-    }
-    return this.collectionValue(type, unique.items);
+    return convertValue(this, v, type);
   }
   equal(a, b, exact = false) {
     return structuralEqual(this, a, b, exact);
+  }
+  exactCompare(a, b, leftType, rightType) {
+    check(
+      this.acceptsType(leftType, this.valueType(a)) && this.acceptsType(rightType, this.valueType(b)),
+      "exact comparison operand/view mismatch",
+    );
+    return structuralEqual(this, a, b, true, { left: leftType, right: rightType });
   }
   binary(operator, a, b) {
     if (["==", "!=", "===", "!=="].includes(operator)) {

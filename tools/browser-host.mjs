@@ -2,6 +2,7 @@
 // saved execution is restored before starting any new story evaluation.
 import { installChoiceScript } from "/runtime/src/choicescript.mjs";
 import { loadCompiledProgram } from "/runtime/src/packages.mjs";
+import { readBrowserCode } from "/runtime/src/browser-code.mjs";
 import { readPresentation, savePresentation } from "/browser-save.mjs";
 import { fixtureSource } from "./browser-fixtures.mjs";
 
@@ -72,12 +73,7 @@ async function loadFixture() {
   const checkpoint = localStorage.getItem(storageKey());
   window.Scene.baseUrl = packaged ? "/package" : nativeBaseUrl;
   if (checkpoint) {
-    if (packaged)
-      program = await loadCompiledProgram(source, async (name) => {
-        const chunk = await fetch("/package/" + name + ".txt");
-        if (!chunk.ok) throw new Error("Cannot load compiled code scene");
-        return chunk.text();
-      });
+    if (packaged) program = await loadCompiledProgram(source, (name) => readBrowserCode(window.Scene, name));
     restoreCheckpoint(checkpoint);
   } else if (packaged) {
     scene.loadLines(source);

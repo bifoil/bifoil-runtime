@@ -1,12 +1,13 @@
 // Named closures exist before their captured declarations. Resolve their cell
 // references at collection time, and keep the original scope while any are absent.
+import { functionCaptureSites } from "./program-code.mjs";
 import { check } from "./errors.mjs";
 import { rootFunction } from "./functions.mjs";
 
 export function indexNamedCaptures(program) {
   const sites = new Map();
-  for (const fn of Object.values(program.functions)) {
-    for (const instruction of fn.code) {
+  for (const id of Object.keys(program.functions)) {
+    for (const instruction of functionCaptureSites(program, id)) {
       if (instruction.op !== "closure") continue;
       const names = instruction.captures;
       if (sites.has(instruction.function)) {

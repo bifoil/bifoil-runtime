@@ -1,13 +1,23 @@
+import { format } from "./values.mjs";
+import { check } from "./errors.mjs";
+import { MAX_TEXT_UNITS, joinText } from "./text.mjs";
+
 // Render explicit String conversions with an owned work stack. Graph depth must
 // not consume the JavaScript call stack, and only active ancestors are cycles.
 export function stringify(machine, root) {
   const pieces = [];
+  let length = 0;
+  const append = (text) => {
+    length += text.length;
+    check(length <= MAX_TEXT_UNITS, "text size budget exceeded");
+    pieces.push(text);
+  };
   const ancestors = new Set();
   const pending = [root];
   while (pending.length) {
     const item = pending.pop();
     if (typeof item === "string") {
-      pieces.push(item);
+      append(item);
       continue;
     }
     if (Object.hasOwn(item, "leave")) {
@@ -15,19 +25,19 @@ export function stringify(machine, root) {
       continue;
     }
     if (["int", "float", "boolean", "string", "char"].includes(item.kind)) {
-      pieces.push(String(item.value));
+      append(format(item));
       continue;
     }
     if (item.kind === "null" || item.kind === "unit") {
-      pieces.push(item.kind === "null" ? "null" : "Unit");
+      append(item.kind === "null" ? "null" : "Unit");
       continue;
     }
     if (item.kind === "function" || item.kind === "builtin" || item.kind === "scene") {
-      pieces.push(item.kind === "scene" ? item.id : "<function>");
+      append(item.kind === "scene" ? item.id : "<function>");
       continue;
     }
     if (item.kind === "range") {
-      pieces.push(
+      append(
         item.first +
           (item.step < 0 ? " downTo " : "..") +
           item.last +
@@ -36,21 +46,21 @@ export function stringify(machine, root) {
       continue;
     }
     if (ancestors.has(item.ref)) {
-      pieces.push("<cycle>");
+      append("<cycle>");
       continue;
     }
     const object = machine.object(item);
     ancestors.add(item.ref);
     pending.push({ leave: item.ref });
     if (item.kind === "list" || item.kind === "set") {
-      pieces.push(item.kind === "list" ? "[" : "{");
+      append(item.kind === "list" ? "[" : "{");
       pending.push(item.kind === "list" ? "]" : "}");
       for (let index = object.items.length - 1; index >= 0; index--) {
         if (index < object.items.length - 1) pending.push(", ");
         pending.push(object.items[index]);
       }
     } else if (item.kind === "map") {
-      pieces.push("{");
+      append("{");
       pending.push("}");
       for (let index = object.entries.length - 1; index >= 0; index--) {
         if (index < object.entries.length - 1) pending.push(", ");
@@ -60,7 +70,12 @@ export function stringify(machine, root) {
     } else if (item.kind === "entry") {
       pending.push(object.value, ": ", object.key);
     } else {
-      pieces.push(object.type.name + "(");
+      const definition = machine.program.types?.[object.type.name];
+      if (machine.program.profile === "bifoil-vm.v3" && definition?.kind === "enum") {
+        append(object.type.name + "." + object.tag);
+        continue;
+      }
+      append(object.type.name + "(");
       pending.push(")");
       const fields = Object.entries(object.fields);
       for (let index = fields.length - 1; index >= 0; index--) {
@@ -70,5 +85,5 @@ export function stringify(machine, root) {
       }
     }
   }
-  return pieces.join("");
+  return joinText(pieces);
 }

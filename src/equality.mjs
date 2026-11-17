@@ -3,18 +3,29 @@ import { keyCandidates } from "./collection-index.mjs";
 // Unordered candidate trials roll back their pair trail when a match fails.
 import { BifoilError } from "./errors.mjs";
 import { sameType } from "./types.mjs";
+import { ComparisonViews } from "./comparison-views.mjs";
 
 class StructuralComparison {
-  constructor(machine, exact) {
+  constructor(machine, exact, views) {
     this.machine = machine;
     this.exact = exact;
+    this.views = views ? new ComparisonViews(machine) : null;
+    this.rootViews = views;
     this.frames = [];
     this.pairs = new Set();
     this.trail = [];
     this.result = false;
   }
-  push(a, b) {
-    this.frames.push({ stage: "start", a, b, waiting: false, index: 0 });
+  push(a, b, leftType, rightType) {
+    this.frames.push({ stage: "start", a, b, leftType, rightType, waiting: false, index: 0 });
+  }
+  child(frame, a, b, position) {
+    this.push(
+      a,
+      b,
+      this.views?.child(frame.leftView, frame.left, position),
+      this.views?.child(frame.rightView, frame.right, position),
+    );
   }
   finish(result) {
     this.frames.pop();
@@ -24,7 +35,7 @@ class StructuralComparison {
     while (this.trail.length > mark) this.pairs.delete(this.trail.pop());
   }
   run(a, b) {
-    this.push(a, b);
+    this.push(a, b, this.rootViews?.left, this.rootViews?.right);
     while (this.frames.length) {
       const frame = this.frames.at(-1);
       if (frame.stage === "start") this.start(frame);
@@ -37,7 +48,12 @@ class StructuralComparison {
   start(frame) {
     const { a, b } = frame;
     if (a.kind === "null" || b.kind === "null") return this.finish(a.kind === b.kind);
-    if (this.exact && !sameType(this.machine.valueType(a), this.machine.valueType(b))) return this.finish(false);
+    if (this.views) {
+      if (a.kind !== b.kind) return this.finish(false);
+      frame.leftView = this.views.effective(frame.leftType, a);
+      frame.rightView = this.views.effective(frame.rightType, b);
+      if (!sameType(frame.leftView, frame.rightView)) return this.finish(false);
+    } else if (this.exact && !sameType(this.machine.valueType(a), this.machine.valueType(b))) return this.finish(false);
     if (["function", "builtin"].includes(a.kind) || ["function", "builtin"].includes(b.kind))
       throw new BifoilError("function equality is unavailable");
     if (a.kind === "scene" || b.kind === "scene") return this.finish(a.kind === b.kind && a.id === b.id);
@@ -57,7 +73,9 @@ class StructuralComparison {
     frame.right = this.machine.object(b);
     const { left, right } = frame;
     if (a.kind === "data" && (left.type.name !== right.type.name || left.tag !== right.tag)) return this.finish(false);
-    const pair = a.ref + ":" + b.ref;
+    // The same cyclic pair can be reached through different declared views.
+    // Memoization must retain that context rather than reuse a broader proof.
+    const pair = a.ref + ":" + b.ref + (this.views ? ":" + this.views.identity(frame.leftView) : "");
     if (a.ref === b.ref || this.pairs.has(pair)) return this.finish(true);
     this.pairs.add(pair);
     this.trail.push(pair);
@@ -91,16 +109,19 @@ class StructuralComparison {
     }
     if (frame.index === frame.count) return this.finish(true);
     frame.waiting = true;
-    if (frame.stage === "list") this.push(frame.left.items[frame.index], frame.right.items[frame.index]);
+    if (frame.stage === "list")
+      this.child(frame, frame.left.items[frame.index], frame.right.items[frame.index], "item");
     else if (frame.stage === "entry") {
       const field = frame.index === 0 ? "key" : "value";
-      this.push(frame.left[field], frame.right[field]);
+      this.child(frame, frame.left[field], frame.right[field], field);
     } else {
       const field = frame.keys[frame.index];
       if (!Object.hasOwn(frame.right.fields, field)) return this.finish(false);
-      this.push(
+      this.child(
+        frame,
         this.machine.state.cells[frame.left.fields[field]].value,
         this.machine.state.cells[frame.right.fields[field]].value,
+        field,
       );
     }
   }
@@ -127,7 +148,7 @@ class StructuralComparison {
     if (!this.nextCandidate(frame, frame.left.items[frame.index])) return this.finish(false);
     frame.mark = this.trail.length;
     frame.waiting = true;
-    this.push(frame.left.items[frame.index], frame.right.items[frame.other]);
+    this.child(frame, frame.left.items[frame.index], frame.right.items[frame.other], "item");
   }
   map(frame) {
     if (frame.waiting) {
@@ -135,7 +156,7 @@ class StructuralComparison {
         this.rollback(frame.mark);
         if (this.result) {
           frame.phase = "value";
-          this.push(frame.left.entries[frame.index][1], frame.right.entries[frame.other][1]);
+          this.child(frame, frame.left.entries[frame.index][1], frame.right.entries[frame.other][1], "value");
           return;
         }
         frame.cursor++;
@@ -152,9 +173,9 @@ class StructuralComparison {
     if (!this.nextCandidate(frame, frame.left.entries[frame.index][0])) return this.finish(false);
     frame.mark = this.trail.length;
     frame.waiting = true;
-    this.push(frame.left.entries[frame.index][0], frame.right.entries[frame.other][0]);
+    this.child(frame, frame.left.entries[frame.index][0], frame.right.entries[frame.other][0], "key");
   }
 }
-export function structuralEqual(machine, a, b, exact = false) {
-  return new StructuralComparison(machine, exact).run(a, b);
+export function structuralEqual(machine, a, b, exact = false, views) {
+  return new StructuralComparison(machine, exact, views).run(a, b);
 }

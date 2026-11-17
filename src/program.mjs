@@ -1,3 +1,5 @@
+import { validateInstruction } from "./program-instructions.mjs";
+import { functionMetadata, functionLength } from "./program-code.mjs";
 import { rootFunction } from "./functions.mjs";
 import { validateLegacyProgram } from "./legacy.mjs";
 // Validate the compiled instruction envelope before creating execution state.
@@ -5,77 +7,11 @@ import { check } from "./errors.mjs";
 import { typeValid, sameType } from "./types.mjs";
 import { MAX_FUNCTIONS, MAX_INSTRUCTIONS } from "./program-limits.mjs";
 
-export const PROFILE = "bifoil-vm.v2";
+import { validateProgramVersion } from "./compatibility.mjs";
+export { PROFILE } from "./compatibility.mjs";
 const OWN = (object, key) => Object.hasOwn(object, key);
-const OPERATIONS = new Set([
-  "unreachable",
-  "legacy_call",
-  "constant",
-  "load",
-  "declare",
-  "store",
-  "closure",
-  "pop",
-  "dup",
-  "widen",
-  "unary",
-  "binary",
-  "jump",
-  "jump_false",
-  "jump_true",
-  "enter",
-  "exit",
-  "default",
-  "call",
-  "return",
-  "format",
-  "print",
-  "begin_choice",
-  "offer",
-  "choose",
-  "convert",
-  "member",
-  "index",
-  "assert_present",
-  "type_test",
-  "cast",
-  "jump_null",
-  "begin_collection",
-  "collection_add",
-  "check_key",
-  "collection_put",
-  "address_member",
-  "address_index",
-  "read_address",
-  "write_address",
-  "range",
-  "range_step",
-  "iter_start",
-  "iter_next",
-  "iter_end",
-  "stack_mark",
-  "stack_reset",
-  "stack_end",
-  "unwind",
-  "unused",
-  "scene_call",
-  "specialize",
-  "construct",
-  "uninitialized",
-  "function_value",
-  "prose_start",
-  "prose_text",
-  "prose_flush",
-  "prose_end",
-  "prose_unwind",
-]);
 export function validateProgram(program) {
-  check(
-    program &&
-      ["bifoil.program.v1", "bifoil.program.v2"].includes(program.format) &&
-      ["bifoil-vm.v1", PROFILE].includes(program.profile),
-    "unsupported program format/profile",
-  );
+  validateProgramVersion(program);
   check(typeof program.build === "string" && /^[0-9a-f]{64}$/.test(program.build), "invalid build identity");
   check(program.functions && typeof program.functions === "object", "missing functions");
   const functionIds = Object.keys(program.functions);
@@ -84,6 +20,11 @@ export function validateProgram(program) {
   for (const id of functionIds) {
     const fn = program.functions[id];
     const sig = fn.signature;
+    check(
+      (fn.init === undefined || typeof fn.init === "boolean") &&
+        (fn.local === undefined || typeof fn.local === "boolean"),
+      "invalid function flags",
+    );
     check(
       sig &&
         sig.id === id &&
@@ -108,36 +49,10 @@ export function validateProgram(program) {
       "invalid parameters",
     );
     check(new Set(sig.params.map((p) => p.name)).size === sig.params.length, "duplicate parameters");
-    check(Array.isArray(fn.code) && fn.code.length > 0, "invalid function body");
-    count += fn.code.length;
+    const metadata = functionMetadata(program, id);
+    if (!metadata) validateFunctionBody(program, fn);
+    count += functionLength(program, id);
     check(count <= MAX_INSTRUCTIONS, "instruction budget exceeded");
-    for (const op of fn.code) {
-      check(
-        op &&
-          OPERATIONS.has(op.op) &&
-          op.span &&
-          typeof op.span.file === "string" &&
-          Number.isInteger(op.span.line) &&
-          op.span.line > 0,
-        "invalid instruction",
-      );
-      if (OWN(op, "target") && op.op !== "legacy_call")
-        check(Number.isInteger(op.target) && op.target >= 0 && op.target < fn.code.length, "invalid jump");
-      if (op.op === "choose" && op.fallback !== null) {
-        check(Number.isInteger(op.fallback) && op.fallback >= 0 && op.fallback < fn.code.length, "invalid fallback");
-      }
-      if (op.op === "closure" || op.op === "function_value")
-        check(OWN(program.functions, op.function), "unknown closure target");
-      if ((op.op === "closure" || op.op === "function_value") && op.captures !== undefined)
-        check(
-          Array.isArray(op.captures) &&
-            op.captures.length <= 100000 &&
-            op.captures.every((name) => typeof name === "string" && name.length > 0) &&
-            new Set(op.captures).size === op.captures.length,
-          "invalid closure capture names",
-        );
-      if (op.op === "constant" || op.op === "declare") check(typeValid(op.ty), "invalid instruction type");
-    }
   }
   check(
     program.shared === undefined ||
@@ -187,4 +102,9 @@ export function validateProgram(program) {
   );
   validateLegacyProgram(program);
   return program;
+}
+
+export function validateFunctionBody(program, fn) {
+  check(Array.isArray(fn.code) && fn.code.length > 0, "invalid function body");
+  for (const op of fn.code) validateInstruction(program, op, fn.code.length);
 }

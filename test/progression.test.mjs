@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { VM } from "../src/vm.mjs";
+import { spawnSync } from "node:child_process";
 
 const integer = (value) => ({ kind: "int", value });
 const progression = (first, last, step, name = "IntProgression") => ({
@@ -75,4 +76,50 @@ test("checkpoints preserve progression invariants and reject malformed range tag
     cell.ty = cell.value.type;
     assert.throws(() => VM.restore(vm.program, JSON.stringify(invalid)), /invalid checkpoint cell/);
   }
+});
+
+test("the last valid search index can exhaust without a spurious overflow check", () => {
+  const vm = machine();
+  for (const [range, last, absent] of [
+    [progression(-2147483648, -1, 1), -1, 0],
+    [progression(2147483647, 0, -1), 0, -1],
+    [progression(-2147483648, 2147483646, 2), 2147483646, 2147483647],
+    [progression(2147483647, -2147483647, -2), -2147483647, -2147483648],
+  ]) {
+    assert.equal(vm.contains(range, integer(last)), true);
+    assert.equal(vm.contains(range, integer(absent)), false);
+  }
+  for (const [range, next, absent] of [
+    [progression(-2147483648, 0, 1), 0, 1],
+    [progression(2147483647, -1, -1), -1, -2],
+  ]) {
+    assert.throws(() => vm.contains(range, integer(next)), /progression search index overflow/);
+    assert.throws(() => vm.contains(range, integer(absent)), /progression search index overflow/);
+    assert.equal(vm.contains(range, integer(range.first)), true);
+  }
+});
+
+test("full-domain membership finishes under an external deadline without enumerating the domain", () => {
+  const vmUrl = new URL("../src/vm.mjs", import.meta.url).href;
+  const fixture = new URL("./fixtures/unicode.json", import.meta.url).href;
+  const script = `
+    import { readFileSync } from "node:fs";
+    import { VM } from ${JSON.stringify(vmUrl)};
+    const machine = new VM(JSON.parse(readFileSync(new URL(${JSON.stringify(fixture)}), "utf8")));
+    const range = { kind: "range", type: { kind: "named", name: "IntProgression", args: [] },
+      first: -2147483648, last: 2147483647, step: 1, empty: false };
+    const result = [-2147483648, -1, 0].map(value => {
+      try { return machine.contains(range, { kind: "int", value }); }
+      catch (error) { return error.message; }
+    });
+    console.log(JSON.stringify(result));
+  `;
+  const result = spawnSync(process.execPath, ["--input-type=module", "-e", script], {
+    encoding: "utf8",
+    timeout: 3000,
+    maxBuffer: 4096,
+  });
+  assert.ifError(result.error);
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(JSON.parse(result.stdout), [true, true, "progression search index overflow"]);
 });

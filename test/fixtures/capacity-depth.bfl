@@ -1,0 +1,17 @@
+suspend fun descend(depth: Int) -> Int:
+    if depth == 0:
+        choice:
+            option "Unwind":
+                return 0
+    return 1 + descend(depth - 1)
+
+scene start():
+    var depth: Int
+    choice:
+        option "At limit":
+            depth = 1022
+        option "Beyond limit":
+            depth = 1023
+    val result = descend(depth)
+    prose:
+        Depth ${result}.

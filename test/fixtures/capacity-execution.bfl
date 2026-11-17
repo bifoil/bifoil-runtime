@@ -1,0 +1,7 @@
+scene start():
+    var checksum = 0
+    for index in 0..<100000:
+        val temporary = mutable [index]
+        checksum = (checksum + temporary[0]) % 97
+    prose:
+        Checksum ${checksum}.

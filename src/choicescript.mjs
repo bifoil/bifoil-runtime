@@ -1,7 +1,10 @@
+import { packageReferences } from "./package-format.mjs";
+import { validateProgramVersion } from "./compatibility.mjs";
 import { print as defaultPrint, renderChoice, renderInput } from "./presentation.mjs";
 import { createChoiceScriptHost } from "./legacy/choicescript.mjs";
 import { VM, BifoilError } from "./vm.mjs";
-import { PACKAGE_FORMAT, loadPackage, validCodeScene, validateCodeChunk } from "./packages.mjs";
+import { readBrowserCode } from "./browser-code.mjs";
+import { PACKAGE_FORMAT, LAZY_PACKAGE_FORMAT, loadPackage, validCodeScene, validateCodeChunk } from "./packages.mjs";
 
 /**
  * Register the explicit Bifoil instruction command without editing the ChoiceScript engine.
@@ -13,7 +16,15 @@ export function installChoiceScript(Scene, hooks = {}) {
   const print = hooks.print ?? defaultPrint;
   const render = hooks.renderChoice ?? renderChoice;
   const showInput = hooks.renderInput ?? ((scene, input, submit) => renderInput(scene, input, submit, print));
+  function reportFailure(scene, error) {
+    if (scene.bifoilFailure === error) return;
+    scene.bifoilFailure = error;
+    if (hooks.error) hooks.error(scene, error);
+    else print(scene, error.message);
+  }
   function attach(scene, program, checkpoint = null) {
+    // Reject incompatible input before constructing an effectful host factory.
+    validateProgramVersion(program);
     const previous = scene.bifoilSession;
     const releasePrevious = () => previous?.machine?.legacy?.cancel?.();
     const needsLegacy =
@@ -70,6 +81,25 @@ export function installChoiceScript(Scene, hooks = {}) {
         print(scene, paragraph);
       }
       if (!attached()) return result;
+      if (result.status === "loading") {
+        delete scene.stats.bifoil_checkpoint;
+        const ticket = generation;
+        const ready = result.ready.then(() => {
+          if (!attached() || ticket !== generation) return null;
+          return advance(() => machine.run());
+        });
+        scene.bifoilLoading = ready;
+        ready.then(
+          () => {
+            if (scene.bifoilLoading === ready) delete scene.bifoilLoading;
+          },
+          (error) => {
+            if (scene.bifoilLoading === ready) delete scene.bifoilLoading;
+            if (attached()) reportFailure(scene, error);
+          },
+        );
+        return { ...result, ready };
+      }
       if (result.status === "running") {
         delete scene.stats.bifoil_checkpoint;
         const schedule = hooks.schedule ?? ((continueExecution) => globalThis.setTimeout(continueExecution, 0));
@@ -125,6 +155,9 @@ export function installChoiceScript(Scene, hooks = {}) {
     staged.get(this.stats).set(this.name, "*bifoil_module " + data + "\n*return\n");
   };
   function startPackage(scene, manifest) {
+    // Check the version and root inventory before retiring a live session.
+    packageReferences(manifest);
+    const sourceContext = { baseUrl: Scene.baseUrl };
     const code = staged.get(scene.stats) ?? new Map();
     staged.delete(scene.stats);
     scene.bifoilSession?.machine?.legacy?.cancel?.();
@@ -137,27 +170,30 @@ export function installChoiceScript(Scene, hooks = {}) {
     const ready = loadPackage(
       manifest,
       (name) => {
-        if (!code.has(name)) throw new BifoilError("compiled code scene was not loaded: " + name);
-        const source = code.get(name);
-        code.delete(name);
-        return source;
+        if (code.has(name)) {
+          const source = code.get(name);
+          code.delete(name);
+          return source;
+        }
+        if (manifest.format === LAZY_PACKAGE_FORMAT)
+          return hooks.readChunk ? hooks.readChunk(scene, name) : readBrowserCode(sourceContext, name);
+        throw new BifoilError("compiled code scene was not loaded: " + name);
       },
-      { digest: hooks.digest },
-    ).then((program) => {
+      { digest: hooks.digest, maxResidentModules: hooks.maxResidentModules, maxResidentBytes: hooks.maxResidentBytes },
+    ).then(async (program) => {
       if (scene.bifoilSession !== pending) return null;
       started = attach(scene, program);
       if (scene.bifoilLoading === ready) delete scene.bifoilLoading;
-      started.run();
-      return started;
+      let result = started.run();
+      while (result?.status === "loading") result = await result.ready;
+      return scene.bifoilSession === started ? started : null;
     });
     scene.bifoilLoading = ready;
     ready.catch((error) => {
       if (scene.bifoilLoading === ready) delete scene.bifoilLoading;
       if (scene.bifoilSession !== pending && scene.bifoilSession !== started) return;
       if (scene.bifoilSession === pending) delete scene.bifoilSession;
-      scene.bifoilFailure = error;
-      if (hooks.error) hooks.error(scene, error);
-      else print(scene, error.message);
+      reportFailure(scene, error);
     });
   }
   Scene.validCommands.bifoil = 1;
@@ -168,7 +204,7 @@ export function installChoiceScript(Scene, hooks = {}) {
     } catch {
       throw new BifoilError("invalid compiled program JSON");
     }
-    if (program?.format === PACKAGE_FORMAT) startPackage(this, program);
+    if ([PACKAGE_FORMAT, LAZY_PACKAGE_FORMAT].includes(program?.format)) startPackage(this, program);
     else attach(this, program).run();
   };
   // The save host restores normal ChoiceScript stats, then explicitly attaches this session.

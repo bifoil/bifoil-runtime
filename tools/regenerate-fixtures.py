@@ -13,6 +13,8 @@ arguments = argparse.ArgumentParser(description=__doc__)
 arguments.add_argument("compiler", type=Path)
 names = [
     "checkpoint",
+    "capacity-depth",
+    "capacity-execution",
     "ordering",
     "overflow",
     "escaping",

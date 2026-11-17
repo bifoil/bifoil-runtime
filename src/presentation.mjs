@@ -3,7 +3,9 @@
 import { BifoilError } from "./errors.mjs";
 
 export function print(scene, text) {
-  scene.accumulatedParagraph.push(text);
+  // The VM transcript uses real newlines. ChoiceScript's paragraph renderer
+  // represents visible line breaks with its existing inline marker.
+  scene.accumulatedParagraph.push(text.replace(/\r\n|\r|\n/g, "[n/]"));
   scene.paragraph();
 }
 function controls(parent) {

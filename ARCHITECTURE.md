@@ -3,20 +3,37 @@
 The runtime executes already compiled instructions. It does not parse Bifoil source or replace the ChoiceScript
 interpreter. The ChoiceScript adapter registers an explicit extension against an unmodified engine.
 
+## Compatibility ownership
+
+`src/compatibility.mjs` owns supported program/checkpoint version pairs and the current profile identity. Program
+validation and the adapter share the same header check. Checkpoints additionally require the exact program profile
+and build. The package parser retains its stricter current-profile requirement for both layouts and code chunks.
+
+Adapter attachment checks the program header before constructing a host factory. Package commands check the version
+and root inventory before consuming staged code or retiring a live session. Complete program/checkpoint validation
+still precedes execution, native restoration, and release of the previous continuation. Later asynchronous code-load
+failures retain the existing terminal/session-lifetime behavior. See the
+[compatibility contract](../bifoil-language/compatibility-contract.md) for producer and migration rules.
+
 ## Compiled package ownership
 
-`src/packages.mjs` owns portable package parsing, chunk checksums, module/function ownership, and assembly into the
-ordinary v2 program view. `src/node-program.mjs` restricts filesystem reads to validated sibling scene names and uses
-Node's native digest implementation. The CLI and conformance executor share that reader. Files are read through a
-bounded buffer and streaming UTF-8 decoder; stat rejects oversized inputs immediately, and byte accounting also detects
-growth during reading. Multibyte scalars crossing a buffer boundary retain their original text. Every opened handle
-closes on success or failure.
+`src/package-format.mjs` owns shared portable format, inventory, and checksum validation. `src/packages.mjs` retains
+eager v1 assembly and dispatches v2 to `src/lazy-packages.mjs`. The latter owns immutable declaration views, queued
+coalesced loads, complete verified-module publication, and bounded LRU body residency. `src/program-code.mjs` provides
+one private metadata/body interface to the VM, collector, legacy boundary, and checkpoint validator. Header derivation
+and ordinary instruction envelopes share `src/code-metadata.mjs` and `src/program-instructions.mjs`.
 
-The ChoiceScript adapter stages code text by stats-object identity. Its asynchronous root load installs a placeholder
-session; only that same live placeholder may attach the assembled machine or report an error. Replacement, restoration,
-and detachment invalidate it. Consumed staged text is released as chunks are decoded, but all code remains resident
-before execution. The browser harness exercises both the actual native loading prelude and fresh-page program assembly
-for restoration.
+`src/node-program.mjs` restricts filesystem reads to validated sibling names, bounded UTF-8 decoding, and native
+digests.
+`src/browser-code.mjs` enforces the same byte budget on streaming browser responses. Opened readers release their
+resources on success or failure. Custom transports can supply the existing portable loader hook.
+
+A package v2 VM retains its current body across host yields; callers retain IDs and PCs. Eviction therefore requires
+checked refetching on return, without replay. Checkpoint validation uses continuation/capture summaries and can restore
+a prepared wait with no body reads. Code waits are separate from saveable input. Adapter continuations check session
+identity and generation, so obsolete loads cannot attach or resume after replacement. Eager v1 registration remains
+available by stats-object identity. See [the versioned loading contract](LAZY_PACKAGES.md) for cache accounting and
+remaining metadata/capacity limits.
 
 ## Execution and dependencies
 
@@ -88,6 +105,10 @@ views; validation still checks those safe views against the original reified con
 functions, bound references, variadics, and suspension.
 
 
+Profile v3 exact comparison owns ephemeral declared views in `src/comparison-views.mjs`. Its iterative comparator
+keeps view identity in cyclic pair facts and derives child types from exposed fields/container positions. The heap's
+retained construction types remain unchanged. V1/v2 instructions retain their earlier exact-comparison behavior.
+
 The execution loop advances the program counter before dispatching an instruction. A prepared choice retains evaluated
 labels, enabled states, option destinations, and once-history identifiers. Input checkpoints serialize the graph plus
 active frames, operands, generic arguments, prose buffers, and choice snapshots. Loading validates build/profile and
@@ -109,6 +130,10 @@ matches caused by retaining failed-trial pairs. String traversal stores the orig
 cursor, while collection traversals retain their selected shallow snapshots. Explicit String conversion uses a work
 stack and tracks active ancestors, so deep graphs do not consume the host call stack and repeated aliases remain
 independently rendered.
+
+`src/conversions.mjs` owns iterative implicit conversions and explicit collection copies. Continuation frames retain
+one pending child at each level, preserve map key-before-value checks, and keep shallow aliases and projected types.
+See [value operation depth and width](VALUE_OPERATIONS.md) for controls and the separate descriptor/heap boundaries.
 
 Set and map operations use ephemeral indexes over container arrays. Primitive keys have compatible equality buckets;
 composite keys retain conservative structural comparisons. Incremental insertion updates the index, while removal and
@@ -194,3 +219,12 @@ maintenance checks; they do not establish full steering conformance or release r
 `src/program-limits.mjs` owns the loaded function and instruction guards used by both inline validation and package
 assembly. These bound code tables separately from execution heap, call depth, and checkpoint limits. Boundary tests
 reject oversized inline and combined package tables before execution.
+
+## Checked text assembly
+
+The text module owns the development per-String storage guard, scalar validation diagnostics, and checked joins.
+Primitive concatenation, interpolation, prose assembly, and explicit graph rendering check combined length before
+allocating a result. Scalar positions remain independent of UTF-16 storage accounting. The VM validates host output
+and input text; checkpoint validation rejects malformed presentation text before restoring any external state.
+Input API rejection preserves the prepared wait. A checked execution failure keeps its original Bifoil source span
+and completed output. External preallocation and total retained heap/transcript memory need separate controls.

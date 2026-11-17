@@ -1,3 +1,5 @@
+import { programCode } from "./program-code.mjs";
+import { assertScalarText, joinText } from "./text.mjs";
 import { indexNamedCaptures } from "./closure-captures.mjs";
 import { rootFunction } from "./functions.mjs";
 import { installLegacyCells, readLegacy, writeLegacy, callLegacy, chooseLegacy, restoreLegacyHost } from "./legacy.mjs";
@@ -68,6 +70,51 @@ export class VM extends RuntimeMembers {
       }
     }
   }
+  // The current body is an execution handle, separate from the evictable
+  // package cache. Returning to an evicted caller fetches its body at its saved
+  // PC; call setup, arguments, defaults, and completed output do not repeat.
+  frameCode(id) {
+    if (this.activeCode?.id === id) return this.activeCode.code;
+    const code = this.program.functions[id].code;
+    if (code) {
+      this.activeCode = { id, code };
+      return code;
+    }
+    if (!this.loading) {
+      const ready = programCode(this.program)
+        .loadFunction(id)
+        .then(
+          (code) => {
+            this.activeCode = { id, code };
+            this.loading = null;
+          },
+          (error) => {
+            throw haltExecution(this, error);
+          },
+        );
+      this.loading = { status: "loading", ready };
+    }
+    return null;
+  }
+  async runAsync(maxSteps = this.quantum) {
+    const output = [];
+    try {
+      let result = this.run(maxSteps);
+      while (result.status === "loading") {
+        for (const paragraph of result.output) output.push(paragraph);
+        await result.ready;
+        result = this.run(maxSteps);
+      }
+      for (const paragraph of result.output) output.push(paragraph);
+      return { ...result, output };
+    } catch (error) {
+      // Earlier loading results have already drained their completed output.
+      // Return it to the public drain queue before any later failed-slice text.
+      for (const paragraph of this.events) output.push(paragraph);
+      this.events = output;
+      throw error;
+    }
+  }
   validateState() {
     validateCheckpoint(this);
   }
@@ -83,6 +130,7 @@ export class VM extends RuntimeMembers {
   }
 
   emitOutput(paragraph) {
+    assertScalarText(paragraph, "output text");
     this.events.push(paragraph);
     this.state.transcript.push(paragraph);
   }
@@ -130,6 +178,7 @@ export class VM extends RuntimeMembers {
       this.state.pending?.kind === "legacy" && this.state.pending.input && typeof response === "string",
       "no text or number input is waiting",
     );
+    assertScalarText(response, "input text");
     return chooseLegacy(this, response);
   }
   run(maxSteps = this.quantum) {
@@ -165,7 +214,9 @@ export class VM extends RuntimeMembers {
         if (steps++ >= maxSteps) break;
         const frame = this.state.frames.at(-1);
         const fn = this.program.functions[frame.function];
-        const op = fn.code[frame.pc++];
+        const code = this.frameCode(frame.function);
+        if (!code) return { ...this.loading, output: this.drainOutput(), options: [] };
+        const op = code[frame.pc++];
         check(op, "execution ran past function body");
         this.span = op.span;
         const stack = frame.stack;
@@ -255,6 +306,18 @@ export class VM extends RuntimeMembers {
             }
             break;
           }
+          case "exact_compare": {
+            const b = pop(),
+              a = pop();
+            const equal = this.exactCompare(
+              a,
+              b,
+              this.resolveType(op.left_type, frame),
+              this.resolveType(op.right_type, frame),
+            );
+            stack.push(value("boolean", op.negate ? !equal : equal));
+            break;
+          }
           case "binary": {
             const b = pop(),
               a = pop();
@@ -309,15 +372,7 @@ export class VM extends RuntimeMembers {
           }
           case "format": {
             check(Number.isInteger(op.count) && op.count >= 0 && stack.length >= op.count, "invalid interpolation");
-            stack.push(
-              value(
-                "string",
-                stack
-                  .splice(stack.length - op.count, op.count)
-                  .map(format)
-                  .join(""),
-              ),
-            );
+            stack.push(value("string", joinText(stack.splice(stack.length - op.count, op.count).map(format))));
             break;
           }
           case "print": {
@@ -359,6 +414,7 @@ export class VM extends RuntimeMembers {
     } catch (error) {
       throw haltExecution(this, error);
     }
+    if (this.state.done) this.activeCode = null;
     return {
       status: this.state.done ? "done" : this.state.pending ? "waiting" : "running",
       output: this.drainOutput(),
