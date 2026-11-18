@@ -114,3 +114,20 @@ test("collection relocates live assignment keys, bound receivers and all travers
   assert.equal(result.status, "done");
   assert.deepEqual(result.output, ["false", "1", "a", "1", "2"]);
 });
+
+test("collection cannot launder corrupt raw heap kinds or null operands into accepted checkpoints", () => {
+  for (const corrupt of [
+    (machine) => machine.state.frames[0].stack.push(null),
+    (machine) => {
+      const raw = machine.allocateObject({ kind: "unrecognized", type: named("Invalid"), fields: {} });
+      machine.state.frames[0].stack.push({ ...raw, kind: "data" });
+    },
+  ]) {
+    const input = JSON.parse(readFileSync(new URL("./fixtures/checkpoint.json", import.meta.url), "utf8"));
+    const machine = new VM(input);
+    assert.equal(machine.run().status, "waiting");
+    corrupt(machine);
+    collectGarbage(machine);
+    assert.throws(() => VM.restore(input, machine.save()), /invalid checkpoint (object|frame)/);
+  }
+});

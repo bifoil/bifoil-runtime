@@ -129,3 +129,38 @@ test("an explicitly empty shared initialization order needs no shared declaratio
   input.shared_order = [];
   assert.equal(new VM(input).run().status, "done");
 });
+
+test("duplication preserves its operand and widening creates a checked Float", () => {
+  const machine = new VM(
+    program([
+      constant("int", 7),
+      { op: "dup" },
+      { op: "declare", name: "copy", ty: { kind: "int" }, mutable: false },
+      { op: "widen" },
+      { op: "declare", name: "wide", ty: { kind: "float" }, mutable: false },
+    ]),
+  );
+  assert.equal(machine.run().status, "done");
+  assert.ok(machine.state.cells.some((cell) => cell.value?.kind === "int" && cell.value.value === 7));
+  assert.ok(machine.state.cells.some((cell) => cell.value?.kind === "float" && cell.value.value === 7));
+  assert.throws(() => new VM(program([constant("boolean", true), { op: "widen" }])).run(), /invalid widening/);
+});
+
+test("host mutation after validation cannot execute an unknown instruction or resume after failure", () => {
+  const input = program([constant("int", 1)]);
+  const machine = new VM(input);
+  input.functions[input.entry].code[0].op = "unknown_after_validation";
+  let diagnostic;
+  assert.throws(
+    () => machine.run(),
+    (error) => {
+      diagnostic = error;
+      return /src\/original.bfl:1: unknown instruction/.test(error.message);
+    },
+  );
+  assert.equal(machine.state.failed, true);
+  assert.throws(
+    () => machine.run(),
+    (error) => error === diagnostic,
+  );
+});

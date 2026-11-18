@@ -62,6 +62,44 @@ test("restoration retains generic field types, mutability, cyclic aliases, and t
   assert.deepEqual(restored.choose(0).output, ["Result 12; counter 2; next 3; after 3."]);
 });
 
+test("legacy nongeneric fields and active variant tags survive checkpoint restoration", () => {
+  const program = JSON.parse(readFileSync(new URL("./fixtures/checkpoint.json", import.meta.url), "utf8"));
+  const empty = { field_order: [], fields: {}, methods: {}, variants: [], parameters: [] };
+  program.types = {
+    "legacy.Point": {
+      kind: "data",
+      field_order: ["number"],
+      fields: { number: { ty: int, mutable: false, private: false } },
+      methods: {},
+      variants: [],
+    },
+    "legacy.Outcome": { ...empty, kind: "sealed", variants: ["Ready"] },
+    "legacy.Outcome.Ready": { ...empty, kind: "variant", parent: named("legacy.Outcome") },
+  };
+  const machine = new VM(program);
+  assert.equal(machine.run().status, "waiting");
+  const number =
+    machine.state.cells.push({ ty: int, mutable: false, initialized: true, value: { kind: "int", value: 7 } }) - 1;
+  const point = machine.allocateObject({ kind: "data", type: named("legacy.Point"), fields: { number }, tag: null });
+  const variant = machine.allocateObject({
+    kind: "data",
+    type: named("legacy.Outcome.Ready"),
+    fields: {},
+    tag: "Ready",
+  });
+  machine.declare(0, "point", point.type, false, point);
+  machine.declare(0, "variant", variant.type, false, variant);
+  const saved = JSON.parse(machine.save());
+  const restored = VM.restore(program, JSON.stringify(saved));
+  const restoredPoint = restored.object(restored.cell(0, "point").value);
+  assert.equal(restored.state.cells[restoredPoint.fields.number].value.value, 7);
+  assert.equal(restoredPoint.tag, null);
+  assert.equal(restored.object(restored.cell(0, "variant").value).tag, "Ready");
+  assert.deepEqual(restored.choose(0).output, ["Result 12; counter 2; next 3; after 3."]);
+  saved.objects.find((object) => object.type.name === "legacy.Outcome.Ready").tag = "Invented";
+  assert.throws(() => VM.restore(program, JSON.stringify(saved)), /invalid checkpoint nominal tag/);
+});
+
 test("restoration rejects changed nominal field contracts before executing the story", () => {
   for (const mutate of [
     (state) => {

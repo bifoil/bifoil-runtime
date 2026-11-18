@@ -70,6 +70,25 @@ test("earlier checkpoints can omit empty traversal maps and prose bases and stil
   assert.deepEqual(fresh.choose(0).output, ["Result 12; counter 2; next 3; after 3."]);
 });
 
+test("inline saved loop marks must identify an actual mark in their retained function", () => {
+  const program = JSON.parse(readFileSync(new URL("./fixtures/checkpoint.json", import.meta.url), "utf8"));
+  const entry = program.functions[program.entry];
+  for (const instruction of entry.code) {
+    if (typeof instruction.target === "number") instruction.target++;
+    if (typeof instruction.fallback === "number") instruction.fallback++;
+  }
+  entry.code.unshift({ op: "stack_mark", id: 7, span: { file: "src/loop.bfl", line: 1 } });
+  const machine = new VM(program);
+  assert.equal(machine.run().status, "waiting");
+  const saved = JSON.parse(machine.save());
+  assert.equal(saved.frames[0].loopMarks[0].id, 7);
+  assert.deepEqual(VM.restore(program, JSON.stringify(saved)).choose(0).output, [
+    "Result 12; counter 2; next 3; after 3.",
+  ]);
+  saved.frames[0].loopMarks[0].id = 8;
+  assert.throws(() => VM.restore(program, JSON.stringify(saved)), /invalid saved loop stack mark/);
+});
+
 test("optional once identities survive restoration but invalid identities and disabled waits fail", () => {
   for (const once of [null, "original-once"]) {
     const { program, state } = checkpoint();
