@@ -6,9 +6,10 @@ import { setImmediate } from "node:timers/promises";
 import { parseHTML } from "linkedom";
 import { mockModule } from "./module-mocks.mjs";
 import { savePresentation, readPresentation } from "../tools/browser-save.mjs";
+import { VM } from "../src/vm.mjs";
 
 let sequence = 0;
-function browser(t, { selected = "browser", saved = null, fetchFails = false } = {}) {
+function browser(t, { selected = "browser", remembered = selected, saved = null, fetchFails = false } = {}) {
   const { window, document } = parseHTML(readFileSync(new URL("../tools/browser-host.html", import.meta.url), "utf8"));
   const fixture = document.getElementById("fixture");
   const option = document.createElement("option");
@@ -21,7 +22,7 @@ function browser(t, { selected = "browser", saved = null, fetchFails = false } =
       value = next;
     },
   });
-  const stored = new Map([["bifoil.browser.acceptance.fixture", selected]]);
+  const stored = new Map([["bifoil.browser.acceptance.fixture", remembered]]);
   if (saved) stored.set("bifoil.browser.acceptance." + selected, saved);
   const storage = {
     getItem: (key) => stored.get(key) ?? null,
@@ -88,7 +89,15 @@ function browser(t, { selected = "browser", saved = null, fetchFails = false } =
     });
   });
   t.mock.method(console, "error", () => {});
-  mockModule(t, "/runtime/src/choicescript.mjs", { exports: { installChoiceScript: () => adapter } });
+  let adapterHooks;
+  mockModule(t, "/runtime/src/choicescript.mjs", {
+    exports: {
+      installChoiceScript: (_Scene, hooks) => {
+        adapterHooks = hooks;
+        return adapter;
+      },
+    },
+  });
   mockModule(t, "/runtime/src/packages.mjs", {
     exports: {
       loadCompiledProgram: async () => {
@@ -106,7 +115,7 @@ function browser(t, { selected = "browser", saved = null, fetchFails = false } =
     },
   });
   t.after(() => hooks.deregister());
-  return { window, document, fixture, stored, operations, program };
+  return { window, document, fixture, stored, operations, program, finish: () => adapterHooks.finish() };
 }
 async function loadHost() {
   await import(new URL(`../tools/browser-host.mjs?test=${++sequence}`, import.meta.url).href);
@@ -187,4 +196,30 @@ test("browser reports unavailable fixtures without executing story code", async 
   await loadHost();
   assert.equal(b.document.getElementById("status").textContent, "Cannot load original browser fixture");
   assert.equal(b.operations.filter(([name]) => name === "command").length, 0);
+});
+
+test("unknown remembered fixtures retain the default and completion follows current execution state", async (t) => {
+  const b = browser(t, { remembered: "removed-fixture" });
+  await loadHost();
+  assert.equal(b.fixture.value, "browser");
+  assert.equal(b.operations.filter(([name]) => name === "command").length, 1);
+  delete b.window.stats.bifoil_checkpoint;
+  b.finish();
+  assert.equal(b.document.getElementById("status").textContent, "Running");
+  b.window.stats.scene.bifoilSession.machine.state.done = true;
+  b.finish();
+  assert.equal(b.document.getElementById("status").textContent, "Finished");
+  assert.equal(b.document.getElementById("save").disabled, true);
+});
+
+test("earlier plain checkpoints restore inline fixtures without replaying their commands", async (t) => {
+  const input = JSON.parse(readFileSync(new URL("./fixtures/checkpoint.json", import.meta.url), "utf8"));
+  const machine = new VM(input);
+  assert.equal(machine.run().status, "waiting");
+  const saved = machine.save();
+  const b = browser(t, { saved });
+  await loadHost();
+  assert.equal(b.operations.filter(([name]) => name === "command").length, 0);
+  assert.equal(b.operations.find(([name]) => name === "attach")[2], saved);
+  assert.equal(b.operations.find(([name]) => name === "run")[1], '<div id="text"></div>');
 });

@@ -122,3 +122,10 @@ test("an explicit unreachable instruction fails at its original source position"
   const machine = new VM(program([{ op: "unreachable" }]));
   assert.throws(() => machine.run(), /src\/original.bfl:1: reached unreachable control flow/);
 });
+
+test("an explicitly empty shared initialization order needs no shared declarations", () => {
+  const input = program([]);
+  delete input.shared;
+  input.shared_order = [];
+  assert.equal(new VM(input).run().status, "done");
+});

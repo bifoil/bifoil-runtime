@@ -163,3 +163,34 @@ test("providing an unused host does not invent native state in repeated ordinary
   assert.equal(machine.save(), first);
   assert.equal(snapshots, 0);
 });
+
+test("a corrupt checkpoint cannot combine native numeric input with choice options before host restoration", () => {
+  const input = bridge();
+  const machine = new VM(input, null, {
+    legacy: {
+      start: () => ({
+        status: "waiting",
+        options: [],
+        continuation: { token: 3 },
+        input: { kind: "number", minimum: "1", maximum: "9", integer: true, allow_blank: false },
+      }),
+      snapshot: () => ({ saved: true }),
+    },
+  });
+  assert.equal(machine.run().input.kind, "number");
+  const state = JSON.parse(machine.save());
+  state.pending.options.push({ label: "Untrusted choice", enabled: true });
+  let restores = 0;
+  assert.throws(
+    () =>
+      VM.restore(input, JSON.stringify(state), {
+        legacy: {
+          restore() {
+            restores++;
+          },
+        },
+      }),
+    /invalid native input choices/,
+  );
+  assert.equal(restores, 0);
+});

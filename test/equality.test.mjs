@@ -117,3 +117,14 @@ test("progression equality compares the represented sequence and treats empty se
     true,
   );
 });
+
+test("intrinsic function values cannot participate in structural equality", () => {
+  const vm = machine();
+  const intrinsic = vm.cell(0, "$builtin.Int").value;
+  for (const [left, right] of [
+    [intrinsic, intrinsic],
+    [intrinsic, integer(1)],
+    [integer(1), intrinsic],
+  ])
+    assert.throws(() => vm.equal(left, right), /function equality is unavailable/);
+});
