@@ -5,6 +5,7 @@ import { boundaryType, fromLegacy, toLegacy } from "../src/legacy/values.mjs";
 import { validFunctionValue } from "../src/callable-values.mjs";
 import { ComparisonViews } from "../src/comparison-views.mjs";
 import { int, value, unit, nullValue } from "../src/values.mjs";
+import { BifoilError, haltExecution, ensureLive } from "../src/errors.mjs";
 const integer = { kind: "int" },
   string = { kind: "string" };
 const named = (name, ...args) => ({ kind: "named", name, args });
@@ -15,6 +16,31 @@ function heap() {
   });
 }
 const mood = () => ({ kind: "enum", parameters: [], parent: null, fields: {}, variants: ["Mood.Happy", "Mood.Sad"] });
+
+test("halting preserves the first checked diagnostic and cancels host continuations only once", () => {
+  let cancellations = 0;
+  const machine = {
+    state: { failed: false, pending: {} },
+    activeCode: {},
+    loading: {},
+    span: { file: "original.bfl", line: 9 },
+    legacy: {
+      cancel() {
+        cancellations++;
+        throw new Error("Secondary cleanup failure");
+      },
+    },
+  };
+  const failure = new BifoilError("Original checked failure", { file: "original.bfl", line: 4 });
+  assert.equal(haltExecution(machine, failure), failure);
+  assert.equal(haltExecution(machine, new Error("Later failure")), failure);
+  assert.throws(() => ensureLive(machine), failure);
+  assert.equal(cancellations, 1);
+  assert.equal(machine.state.failed, true);
+  assert.equal(machine.state.pending, null);
+  assert.equal(machine.loading, null);
+  assert.equal(machine.activeCode, null);
+});
 
 test("legacy primitive boundaries reject host coercion and invalid scalar data", () => {
   const machine = heap();

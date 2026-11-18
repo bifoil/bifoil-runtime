@@ -18,10 +18,14 @@ async function settle(machine, result = machine.run()) {
   return result;
 }
 
-export async function verifyNarrativeCapacity(path, config) {
+function validateDimensions(config) {
   assert.ok(Number.isInteger(config.scenes) && config.scenes > 0 && config.scenes <= 1022);
   assert.ok(Number.isInteger(config.rows) && config.rows > 0 && config.rows <= 100000);
   assert.ok(Array.isArray(config.rooms) && config.rooms.length > 0 && config.rooms.length <= 3);
+}
+
+export async function verifyNarrativeCapacity(path, config) {
+  validateDimensions(config);
 
   function paragraphHash(room) {
     const index = String(room).padStart(4, "0");

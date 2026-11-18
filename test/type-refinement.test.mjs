@@ -67,3 +67,47 @@ test("nested projections remain the requested element types in mutable copies an
     named("Map", named("Box", star), int),
   );
 });
+
+test("function and scene type descriptors preserve arity, parameter identity and checked variance", () => {
+  const int = { kind: "int" },
+    float = { kind: "float" },
+    any = { kind: "any" },
+    star = { kind: "star" };
+  const scene = (...params) => ({ kind: "scene", params });
+  const callable = (...params) => ({ kind: "function", params, result: int, suspend: false });
+  assert.deepEqual(nonNull(star), any);
+  assert.equal(sameType(scene(int), scene(float)), false);
+  assert.equal(sameType(scene(int), scene()), false);
+  assert.equal(sameType(callable(int), callable(float)), false);
+  assert.equal(subtype(scene(int), callable(int)), false);
+  assert.equal(typeValid(scene(int)), true);
+  for (const invalid of [
+    { kind: "scene", params: null },
+    scene({ kind: "unknown" }),
+    { kind: "parameter", name: 1 },
+    { ...callable(), vararg: true },
+    { ...callable(int), params: [null] },
+    { ...callable(), result: null },
+  ])
+    assert.equal(typeValid(invalid), false);
+  const parameter = { kind: "parameter", name: "T" };
+  assert.deepEqual(substitute(scene(parameter), { T: int }), scene(int));
+  assert.throws(() => substitute(parameter, {}), /unresolved runtime type parameter/);
+  const named = (name, ...args) => ({ kind: "named", name, args });
+  const definitions = { Consumer: { parameters: [{ name: "T", variance: -1 }] } };
+  assert.equal(subtype(named("Consumer", any), named("Consumer", int), definitions), true);
+  assert.equal(subtype(named("Consumer", int), named("Consumer", any), definitions), false);
+  assert.equal(subtype(named("Consumer", int), named("Consumer"), definitions), false);
+});
+
+test("projected copies cannot create an unrelated nominal view or change a callable's arity", () => {
+  const int = { kind: "int" },
+    star = { kind: "star" };
+  const named = (name, ...args) => ({ kind: "named", name, args });
+  const copy = (requested, actual) => reifyCollectionCopy(named("List", requested), named("List", actual));
+  assert.deepEqual(copy(named("Box", star), named("Other", int)), named("List", named("Box", star)));
+  const callable = (...params) => ({ kind: "function", params, result: int, suspend: false });
+  assert.deepEqual(copy(callable(), callable(int)), named("List", callable()));
+  const scene = (...params) => ({ kind: "scene", params });
+  assert.deepEqual(copy(scene(star), scene(int)), named("List", scene(star)));
+});

@@ -2,6 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { VM } from "../src/vm.mjs";
+import { validFunctionValue } from "../src/callable-values.mjs";
+import { BifoilError } from "../src/errors.mjs";
 
 const int = { kind: "int" };
 const string = { kind: "string" };
@@ -48,6 +50,22 @@ function prepared(generic = false, widen = false) {
 function selected(state) {
   return state.cells[state.envs[0].bindings.selected];
 }
+
+test("callable validation rejects checked signature failures and preserves unexpected host failures", () => {
+  for (const failure of [new BifoilError("Invalid checked signature"), new RangeError("Unexpected host failure")]) {
+    const { program } = prepared();
+    const machine = new VM(program);
+    const callable = {
+      ...machine.cell(0, "helpers.add").value,
+      type: machine.functionType(program.functions["helpers.add"].signature),
+    };
+    machine.functionType = () => {
+      throw failure;
+    };
+    if (failure instanceof BifoilError) assert.equal(validFunctionValue(machine, callable), false);
+    else assert.throws(() => validFunctionValue(machine, callable), failure);
+  }
+});
 
 test("stored functions retain declared, generic, and safely widened signature views", () => {
   for (const [generic, widen] of [

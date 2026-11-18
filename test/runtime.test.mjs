@@ -8,6 +8,26 @@ const fixture = (name) => JSON.parse(readFileSync(new URL("./fixtures/" + name +
 const primitive = (kind, value) => ({ kind, value });
 const integer = (n) => primitive("int", n);
 
+test("primitive comparison guards reject function values, incompatible ordered values and fractional remainders", () => {
+  const callable = { kind: "function", id: "original", env: 0 };
+  for (const operator of ["===", "!==", "==", "!="]) {
+    assert.throws(() => binary(operator, callable, integer(3)), BifoilError);
+    assert.throws(() => binary(operator, integer(3), callable), BifoilError);
+  }
+  assert.equal(binary("===", integer(3), primitive("float", 3)).value, false);
+  assert.equal(binary("!==", integer(3), primitive("float", 3)).value, true);
+  assert.throws(() => binary("==", primitive("string", "3"), integer(3)), /incompatible equality/);
+  for (const [left, right] of [
+    [integer(3), primitive("string", "3")],
+    [primitive("string", "3"), integer(3)],
+    [primitive("boolean", true), primitive("string", "true")],
+  ])
+    assert.throws(() => binary("<", left, right), /incompatible ordered operands/);
+  assert.throws(() => binary("%", primitive("float", 3), integer(2)), /remainder requires Int/);
+  assert.throws(() => binary("%", integer(3), primitive("float", 2)), /remainder requires Int/);
+  assert.throws(() => binary("unknown", integer(3), integer(2)), /unsupported binary operator/);
+});
+
 test("compiled checkpoint preserves partial expressions, shared captured cells, and label snapshots", () => {
   const program = fixture("checkpoint");
   const machine = new VM(program);
