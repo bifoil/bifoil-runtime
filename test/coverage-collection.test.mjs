@@ -87,6 +87,15 @@ test("an empty counter directory cannot replace completed coverage", (t) => {
   assert.throws(() => collectCoverage(root, reporter(root, { empty: true })), /no source coverage/);
   assert.equal(existsSync(join(root, "coverage/coverage.lcov")), false);
 });
+
+test("a runner failure before log creation still invalidates earlier coverage", (t) => {
+  const root = fixture(t);
+  mkdirSync(join(root, "coverage"));
+  writeFileSync(join(root, "coverage/coverage.lcov"), "stale");
+  assert.throws(() => collectCoverage(root, () => ({ status: 1 })), /Coverage tests failed/);
+  assert.equal(existsSync(join(root, "coverage/coverage.lcov")), false);
+  assert.equal(existsSync(join(root, "coverage/tests.log")), false);
+});
 test("configuration, environment, output boundary and test discovery are checked", (t) => {
   for (const config of [null, {}, { includes: [] }]) {
     const root = fixture(t, config);
