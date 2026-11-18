@@ -32,3 +32,21 @@ test("anonymous imports of development entrypoints perform no CLI operations", (
   assert.equal(result.stdout, "");
   assert.equal(result.stderr, "");
 });
+
+test("the coverage CLI rejects a missing explicit engine before starting collection", () => {
+  const environment = { ...process.env };
+  delete environment.CHOICESCRIPT_ENGINE;
+  const observer = environment.BIFOIL_ISTANBUL_DIRECTORY
+    ? ["--import", fileURLToPath(new URL("./coverage-register.mjs", import.meta.url))]
+    : [];
+  const result = spawnSync(process.execPath, [...observer, "tools/collect-coverage.mjs"], {
+    cwd: fileURLToPath(new URL("../", import.meta.url)),
+    env: environment,
+    encoding: "utf8",
+    timeout: environment.BIFOIL_ISTANBUL_DIRECTORY ? 60000 : 10000,
+  });
+  assert.equal(result.error, undefined);
+  assert.equal(result.status, 1);
+  assert.equal(result.stdout, "");
+  assert.match(result.stderr, /Coverage requires an explicit CHOICESCRIPT_ENGINE/);
+});

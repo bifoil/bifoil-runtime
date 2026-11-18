@@ -58,6 +58,15 @@ test("malformed saved traversal cursors fail before a choice can resume", () => 
   }
 });
 
+test("earlier checkpoints can omit their empty traversal maps and still collect and resume", () => {
+  const { program, state } = checkpoint();
+  for (const frame of state.frames) delete frame.iterators;
+  const restored = VM.restore(program, JSON.stringify(state));
+  const savedAgain = restored.save();
+  const fresh = VM.restore(program, savedAgain);
+  assert.deepEqual(fresh.choose(0).output, ["Result 12; counter 2; next 3; after 3."]);
+});
+
 test("optional once identities survive restoration but invalid identities and disabled waits fail", () => {
   for (const once of [null, "original-once"]) {
     const { program, state } = checkpoint();
