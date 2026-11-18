@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { VM } from "../src/vm.mjs";
 import { loadPackage } from "../src/packages.mjs";
 import { packageCodeStats } from "../src/program-code.mjs";
+import { ComparisonViews } from "../src/comparison-views.mjs";
 import { splitCompiledProgram } from "./support/packages.mjs";
 
 const named = (name, ...args) => ({ kind: "named", name, args });
@@ -75,6 +76,31 @@ function record(machine, type, values) {
   return machine.allocateObject({ kind: "data", type, fields });
 }
 const compare = (machine, a, b, left, right = left) => machine.exactCompare(a, b, left, right);
+
+test("symbolic comparison-view identity preserves parameter names and non-null refinement", () => {
+  const machine = new VM(program());
+  const views = new ComparisonViews(machine);
+  const symbolic = { kind: "parameter", name: "T" };
+  assert.equal(views.identity(symbolic), views.identity({ ...symbolic, nonnull: false }));
+  assert.notEqual(views.identity(symbolic), views.identity({ ...symbolic, nonnull: true }));
+  assert.notEqual(views.identity(symbolic), views.identity({ ...symbolic, name: "U" }));
+  assert.deepEqual(views.effective(undefined, integer(3)), intType);
+});
+
+test("legacy field views accept omitted generic metadata and leave unknown owners untyped", () => {
+  const input = program();
+  const plain = definition({ number: field(intType) });
+  delete plain.parameters;
+  input.types["legacy.Plain"] = plain;
+  const machine = new VM(input);
+  const views = new ComparisonViews(machine);
+  const value = record(machine, named("legacy.Plain"), { number: integer(3) });
+  assert.deepEqual(views.child(named("legacy.Plain"), machine.object(value), "number"), intType);
+  assert.equal(views.child(named("legacy.Plain"), machine.object(value), "absent"), undefined);
+  const unknownOwner = { kind: "data", type: named("legacy.Unavailable"), fields: {} };
+  assert.equal(views.child(unknownOwner.type, unknownOwner, "number"), undefined);
+  assert.deepEqual(views.effective(undefined, integer(4)), intType);
+});
 
 test("declared covariant views compare exactly without replacing construction identities", () => {
   const machine = new VM(program());
