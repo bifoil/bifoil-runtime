@@ -83,6 +83,29 @@ test("initial package load failure is reported once across nested loader promise
   assert.equal(scene.bifoilLoading, undefined);
 });
 
+test("eager packages reject unstaged code before execution and never use lazy network fallback", async () => {
+  const data = splitCompiledProgram(story(), { lazy: false }),
+    Scene = sceneType(),
+    errors = [],
+    output = [];
+  let reads = 0;
+  installChoiceScript(Scene, {
+    readChunk() {
+      reads++;
+      throw new Error("Unexpected lazy fallback");
+    },
+    print: (_scene, text) => output.push(text),
+    error: (_scene, error) => errors.push(error),
+  });
+  const scene = new Scene();
+  scene.bifoil(JSON.stringify(data.manifest));
+  await assert.rejects(scene.bifoilLoading, /compiled code scene was not loaded/);
+  assert.equal(reads, 0);
+  assert.equal(errors.length, 1);
+  assert.deepEqual(output, []);
+  assert.equal(scene.bifoilSession, undefined);
+});
+
 test("a failed polled load clears only its current handle and deduplicates its diagnostic", async () => {
   const pending = delayedCode(),
     Scene = sceneType(),

@@ -7,8 +7,46 @@ import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import { verifyNarrativeCapacity } from "../tools/verify-narrative-capacity.mjs";
 import { splitCompiledProgram } from "./support/packages.mjs";
+import { readCompiledProgram } from "../src/node-program.mjs";
+import { VM } from "../src/vm.mjs";
 
-function program(t, name, edited = false) {
+function addLongSetup(value) {
+  const id = "main.verify_setup",
+    span = { file: "src/setup.bfl", line: 1 },
+    int = { kind: "int" };
+  value.functions[id] = {
+    signature: { id, params: [], result: { kind: "unit" }, suspend: false, scene: false },
+    init: false,
+    local: false,
+    code: [
+      { op: "constant", ty: int, value: 0 },
+      { op: "declare", name: "verifier_setup_count", ty: int, mutable: true },
+      { op: "load", name: "verifier_setup_count" },
+      { op: "constant", ty: int, value: 1 },
+      { op: "binary", operator: "+" },
+      { op: "store", name: "verifier_setup_count" },
+      { op: "load", name: "verifier_setup_count" },
+      { op: "constant", ty: int, value: 200001 },
+      { op: "binary", operator: "<" },
+      { op: "jump_true", target: 2 },
+      { op: "constant", ty: { kind: "unit" }, value: null },
+      { op: "return" },
+    ].map((instruction) => ({ ...instruction, span })),
+  };
+  const entry = value.functions[value.entry];
+  for (const instruction of entry.code) {
+    if (typeof instruction.target === "number") instruction.target += 3;
+    if (typeof instruction.fallback === "number") instruction.fallback += 3;
+  }
+  entry.code.unshift(
+    { op: "load", name: id, span },
+    { op: "call", names: [], direct: true, span },
+    { op: "pop", span },
+  );
+  value.build = "c".repeat(64);
+}
+
+function program(t, name, edited = false, longInitialization = false) {
   const value = JSON.parse(
     readFileSync(new URL(`./fixtures/narrative-capacity/${name}/program.json`, import.meta.url), "utf8"),
   );
@@ -18,6 +56,7 @@ function program(t, name, edited = false) {
         operation.value = operation.value.replace("end0000", "End0000");
     value.build = "a".repeat(64);
   }
+  if (longInitialization) addLongSetup(value);
   const package_ = splitCompiledProgram(value, { lazy: true });
   const directory = mkdtempSync(join(tmpdir(), "bifoil-narrative-verifier-"));
   t.after(() => rmSync(directory, { recursive: true, force: true }));
@@ -79,5 +118,19 @@ test("the narrative verifier CLI validates an explicit compiled package and repo
   const report = JSON.parse(result.stdout);
   assert.equal(report.passed, true);
   assert.equal(report.compiled_modules, 3);
+  assert.equal(report.checked[0].restored_waits, 2);
+});
+
+test("narrative verification completes real setup across the default million-instruction quantum", async (t) => {
+  const startup = program(t, "flat", false, true);
+  const machine = new VM(await readCompiledProgram(startup));
+  let first = machine.run();
+  while (first.status === "loading") {
+    await first.ready;
+    first = machine.run();
+  }
+  assert.equal(first.status, "running");
+  const report = await verifyNarrativeCapacity(startup, { scenes: 1, rows: 2, rooms: [0] });
+  assert.equal(report.passed, true);
   assert.equal(report.checked[0].restored_waits, 2);
 });
