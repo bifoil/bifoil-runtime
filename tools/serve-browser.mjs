@@ -40,24 +40,37 @@ async function routeInventory(engine, packageDirectory) {
     routes.set(route, { directory, file });
   }
   await add("/", runtime, "tools/browser-host.html");
-  for (const name of ["browser-host.mjs", "browser-save.mjs", "browser-fixtures.mjs"])
-    await add("/" + name, path.join(runtime, "tools"), name);
-  for (const name of ["browser.json", "browser-native.json", "browser-output.json", "output-marker.svg"])
-    await add("/fixtures/" + name, path.join(runtime, "test/fixtures"), name);
-  for (const name of assets) await add("/engine/" + name, engine, name);
+  await Promise.all(
+    ["browser-host.mjs", "browser-save.mjs", "browser-fixtures.mjs"].map((name) =>
+      add("/" + name, path.join(runtime, "tools"), name),
+    ),
+  );
+  await Promise.all(
+    ["browser.json", "browser-native.json", "browser-output.json", "output-marker.svg"].map((name) =>
+      add("/fixtures/" + name, path.join(runtime, "test/fixtures"), name),
+    ),
+  );
+  await Promise.all(assets.map((name) => add("/engine/" + name, engine, name)));
   async function modules(directory, prefix = "") {
-    for (const entry of await readdir(directory, { withFileTypes: true })) {
-      if (entry.isDirectory() && /^[a-z-]+$/.test(entry.name))
-        await modules(path.join(directory, entry.name), prefix + entry.name + "/");
-      else if (entry.isFile() && /^[a-z-]+\.mjs$/.test(entry.name))
-        await add("/runtime/src/" + prefix + entry.name, path.join(runtime, "src"), prefix + entry.name);
-    }
+    const entries = await readdir(directory, { withFileTypes: true });
+    await Promise.all(
+      entries.map(async (entry) => {
+        if (entry.isDirectory() && /^[a-z-]+$/.test(entry.name))
+          await modules(path.join(directory, entry.name), prefix + entry.name + "/");
+        else if (entry.isFile() && /^[a-z-]+\.mjs$/.test(entry.name))
+          await add("/runtime/src/" + prefix + entry.name, path.join(runtime, "src"), prefix + entry.name);
+      }),
+    );
   }
   await modules(path.join(runtime, "src"));
   if (packageDirectory) {
     await add("/package/startup.txt", packageDirectory, "startup.txt");
-    for (const name of await readdir(packageDirectory))
-      if (/^bifoil_code_[0-9a-f]{64}\.txt$/.test(name)) await add("/package/" + name, packageDirectory, name);
+    const files = await readdir(packageDirectory);
+    await Promise.all(
+      files
+        .filter((name) => /^bifoil_code_[0-9a-f]{64}\.txt$/.test(name))
+        .map((name) => add("/package/" + name, packageDirectory, name)),
+    );
   }
   return routes;
 }

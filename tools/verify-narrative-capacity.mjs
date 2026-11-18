@@ -10,6 +10,14 @@ import { packageCodeStats } from "../src/program-code.mjs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+async function settle(machine, result = machine.run()) {
+  while (result.status === "running" || result.status === "loading") {
+    if (result.status === "loading") await result.ready;
+    result = machine.run();
+  }
+  return result;
+}
+
 export async function verifyNarrativeCapacity(path, config) {
   assert.ok(Number.isInteger(config.scenes) && config.scenes > 0 && config.scenes <= 1022);
   assert.ok(Number.isInteger(config.rows) && config.rows > 0 && config.rows <= 100000);
@@ -22,14 +30,6 @@ export async function verifyNarrativeCapacity(path, config) {
       hash.update(" x".repeat(Math.min(1024, remaining)));
     hash.update(" " + (room === config.edited_room ? "End" : "end") + index);
     return hash.digest("hex");
-  }
-
-  async function settle(machine, result = machine.run()) {
-    while (result.status === "running" || result.status === "loading") {
-      if (result.status === "loading") await result.ready;
-      result = machine.run();
-    }
-    return result;
   }
 
   function codeResidency(program, { unopened = false } = {}) {

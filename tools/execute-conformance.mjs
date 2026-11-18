@@ -41,8 +41,8 @@ export async function executeConformance(program, config) {
       result = result.input ? machine.submit(response) : machine.choose(response);
     }
     if (index !== (config.choices ?? []).length) throw new Error("unused case selections");
-  } catch (failure) {
-    error = failure.message;
+  } catch (error_) {
+    error = error_.message;
   }
   return { output: machine?.state.transcript ?? [], options, error };
 }
