@@ -2,8 +2,15 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { basename, join, resolve } from "node:path";
+import * as filesystem from "node:fs/promises";
+import { createServer } from "node:http";
+import { spawn } from "node:child_process";
+import { once } from "node:events";
+import { createInterface } from "node:readline";
+import { fileURLToPath } from "node:url";
 import { browserOptions, startBrowserServer } from "../tools/serve-browser.mjs";
+import { mockModule } from "./module-mocks.mjs";
 
 function files(t) {
   const root = mkdtempSync(join(tmpdir(), "bifoil-browser-"));
@@ -99,3 +106,93 @@ test("browser host refuses symlinks escaping selected asset roots before and aft
   assert.equal((await fetch(base + "/engine/scene.js")).status, 404);
   await assert.rejects(startBrowserServer(fixture), /within its selected directory/);
 });
+
+test("the default browser port keeps non-module entries and invalid directories outside its route inventory", async (t) => {
+  const fixture = files(t);
+  mockModule(t, "node:fs/promises", {
+    exports: {
+      ...filesystem,
+      readdir: async (directory, options) => {
+        const entries = await filesystem.readdir(directory, options);
+        if (basename(String(directory)) !== "src") return entries;
+        return [
+          ...entries,
+          { name: "private-data.txt", isDirectory: () => false, isFile: () => true },
+          { name: "private_files", isDirectory: () => true, isFile: () => false },
+        ];
+      },
+    },
+  });
+  const host = await import(new URL("../tools/serve-browser.mjs?inventory-contract", import.meta.url).href);
+  const server = await host.startBrowserServer({ engine: fixture.engine });
+  t.after(
+    () =>
+      new Promise((resolve) => {
+        server.close(resolve);
+        server.closeAllConnections();
+      }),
+  );
+  assert.equal(server.address().port, 8765);
+  const base = "http://127.0.0.1:8765";
+  assert.equal((await fetch(base + "/runtime/src/vm.mjs")).status, 200);
+  assert.equal((await fetch(base + "/runtime/src/private-data.txt")).status, 404);
+  assert.equal((await fetch(base + "/runtime/src/private_files/secret.mjs")).status, 404);
+});
+
+test(
+  "the browser CLI remains responsive to an unknown command and closes on explicit stop",
+  {
+    timeout: process.env.BIFOIL_ISTANBUL_DIRECTORY ? 60000 : 10000,
+  },
+  async (t) => {
+    const fixture = files(t),
+      probe = createServer();
+    probe.listen(0, "127.0.0.1");
+    await once(probe, "listening");
+    const port = probe.address().port;
+    await new Promise((resolve) => probe.close(resolve));
+    const observer = process.env.BIFOIL_ISTANBUL_DIRECTORY
+      ? ["--import", fileURLToPath(new URL("./coverage-register.mjs", import.meta.url))]
+      : [];
+    const child = spawn(
+      process.execPath,
+      [
+        ...observer,
+        "tools/serve-browser.mjs",
+        "--engine-dir",
+        fixture.engine,
+        "--package-dir",
+        fixture.packageDirectory,
+        "--port",
+        String(port),
+      ],
+      {
+        cwd: fileURLToPath(new URL("../", import.meta.url)),
+        stdio: ["pipe", "pipe", "pipe"],
+      },
+    );
+    t.after(() => {
+      if (child.exitCode === null && child.signalCode === null) child.kill();
+    });
+    let errors = "";
+    child.stderr.on("data", (data) => {
+      errors += data;
+    });
+    const completed = once(child, "exit"),
+      lines = createInterface({ input: child.stdout });
+    t.after(() => lines.close());
+    const ready = await Promise.race([
+      once(lines, "line").then(([line]) => line),
+      completed.then(([code]) => {
+        throw new Error("Browser CLI exited before readiness: " + code + ": " + errors);
+      }),
+    ]);
+    assert.equal(ready, "Browser acceptance: http://127.0.0.1:" + port);
+    child.stdin.write("status\n");
+    assert.equal((await fetch("http://127.0.0.1:" + port + "/package/startup.txt")).status, 200);
+    child.stdin.end("stop\n");
+    const [code, signal] = await completed;
+    assert.equal(code, 0, errors);
+    assert.equal(signal, null);
+  },
+);
