@@ -53,6 +53,16 @@ test("native text submissions log the normalized value and accept explicitly all
   assert.deepEqual(scene.nav.bugLog, ["*input_text name Original[n/]words.", "*input_text name "]);
 });
 
+test("headless native input commits without a navigation log", () => {
+  const writes = [];
+  let resets = 0;
+  const scene = { setVar: (...args) => writes.push(args), resetPage: () => resets++ };
+  submitInput(scene, {}, { variable: "answer", input: { kind: "text", allow_blank: false } }, "  Original  ");
+  assert.deepEqual(writes, [["answer", "Original"]]);
+  assert.equal(resets, 1);
+  assert.equal(scene.finished, false);
+});
+
 test("enum boundary descriptors require closed non-generic definitions and plain empty fields", () => {
   const type = { kind: "named", name: "original.Signal" };
   const definition = { kind: "enum", fields: {}, variants: ["original.Signal.Ready"] };
@@ -63,6 +73,8 @@ test("enum boundary descriptors require closed non-generic definitions and plain
   for (const args of ["invalid", {}, [type]]) assert.equal(boundaryType({ ...type, args }, false, definitions), false);
   for (const change of [{ parameters: "invalid" }, { parameters: ["T"] }, { fields: [] }, { fields: null }])
     assert.equal(boundaryType(type, false, { [type.name]: { ...definition, ...change } }), false);
+  assert.equal(boundaryType(undefined), false);
+  assert.equal(boundaryType(type, false, null), false);
   const object = { kind: "data", type, fields: {}, tag: "Ready" };
   const machine = { program: { types: definitions }, object: () => object };
   const item = { kind: "data", id: 1 };
@@ -77,6 +89,10 @@ test("native graph values preserve scalar roots and reject non-array reference e
   for (const value of [null, -Infinity, true, "Original."]) assert.equal(decodeState(encodeState(value)), value);
   for (const value of [null, true, 1, {}])
     assert.throws(() => decodeState({ format: "bifoil.legacy-state.v1", nodes: [], root: value }), /graph value/);
+  assert.throws(
+    () => decodeState({ format: "bifoil.legacy-state.v1", nodes: [], root: ["unrecognized"] }),
+    /unknown native graph value/,
+  );
 });
 
 test("native rendering wrappers flush only when rendering can bypass buffered paragraphs", () => {
