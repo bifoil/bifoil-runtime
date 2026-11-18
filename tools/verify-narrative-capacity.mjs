@@ -24,6 +24,24 @@ function validateDimensions(config) {
   assert.ok(Array.isArray(config.rooms) && config.rooms.length > 0 && config.rooms.length <= 3);
 }
 
+function codeResidency(program, { unopened = false } = {}) {
+  const stats = packageCodeStats(program);
+  assert.ok(stats, "the capacity package must retain on-demand code loading");
+  assert.equal(stats.pendingModules, 0);
+  if (unopened) {
+    assert.equal(stats.loads, 0);
+    assert.equal(stats.residentModules, 0);
+    assert.equal(stats.residentBytes, 0);
+  } else {
+    // This route uses only initialization, routing, and one room. These limits
+    // describe this workload, not the language's general runtime heap budget.
+    assert.ok(stats.loads <= 3);
+    assert.ok(stats.residentModules <= 3);
+    assert.ok(stats.residentBytes <= 2 * 1024 * 1024);
+  }
+  return stats;
+}
+
 export async function verifyNarrativeCapacity(path, config) {
   validateDimensions(config);
 
@@ -34,24 +52,6 @@ export async function verifyNarrativeCapacity(path, config) {
       hash.update(" x".repeat(Math.min(1024, remaining)));
     hash.update(" " + (room === config.edited_room ? "End" : "end") + index);
     return hash.digest("hex");
-  }
-
-  function codeResidency(program, { unopened = false } = {}) {
-    const stats = packageCodeStats(program);
-    assert.ok(stats, "the capacity package must retain on-demand code loading");
-    assert.equal(stats.pendingModules, 0);
-    if (unopened) {
-      assert.equal(stats.loads, 0);
-      assert.equal(stats.residentModules, 0);
-      assert.equal(stats.residentBytes, 0);
-    } else {
-      // This route uses only initialization, routing, and one room. These limits
-      // describe this workload, not the language's general runtime heap budget.
-      assert.ok(stats.loads <= 3);
-      assert.ok(stats.residentModules <= 3);
-      assert.ok(stats.residentBytes <= 2 * 1024 * 1024);
-    }
-    return stats;
   }
 
   const checked = [];
