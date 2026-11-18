@@ -13,10 +13,9 @@ import {
 } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import instrument from "istanbul-lib-instrument";
-import coverage from "istanbul-lib-coverage";
-import reporting from "istanbul-lib-report";
-import reports from "istanbul-reports";
+import { createRequire } from "node:module";
+
+const require = createRequire(import.meta.url);
 
 export function normalizeSources(lcov, root) {
   let records = 0;
@@ -33,9 +32,11 @@ export function normalizeSources(lcov, root) {
 }
 
 function seedSources(root, includes) {
-  const merged = coverage.createCoverageMap({});
+  // Importing a development entrypoint must not initialize the instrumentation
+  // toolchain. Load its dependencies only when collection actually starts.
+  const merged = require("istanbul-lib-coverage").createCoverageMap({});
   const hashes = {};
-  const observer = instrument.createInstrumenter({ esModules: true, compact: false });
+  const observer = require("istanbul-lib-instrument").createInstrumenter({ esModules: true, compact: false });
   for (const pattern of includes) {
     if (!/^[a-z0-9_-]+\/\*\*$/.test(pattern)) throw new Error("Coverage includes must name source directories");
     const directory = pattern.slice(0, -3);
@@ -108,8 +109,8 @@ export function collectCoverage(root, run = spawnSync) {
         .digest("hex");
       if (current !== expected) throw new Error("Coverage source changed during tests: " + name);
     }
-    const context = reporting.createContext({ dir: temporary, coverageMap: merged });
-    reports.create("lcovonly", { file: "coverage.lcov" }).execute(context);
+    const context = require("istanbul-lib-report").createContext({ dir: temporary, coverageMap: merged });
+    require("istanbul-reports").create("lcovonly", { file: "coverage.lcov" }).execute(context);
     const lcov = normalizeSources(readFileSync(join(temporary, "coverage.lcov"), "utf8"), root);
     writeFileSync(join(temporary, "coverage.lcov"), lcov);
     writeFileSync(
