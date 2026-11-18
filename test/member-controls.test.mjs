@@ -11,7 +11,7 @@ const integer = type("int"),
 function heap() {
   return Object.assign(new RuntimeMembers(), {
     program: { profile: "bifoil-vm.v3", types: {}, functions: {} },
-    state: { cells: [], objects: [], frames: [], envs: [{ parent: null, bindings: {} }] },
+    state: { cells: [], objects: [], frames: [], prose: [], envs: [{ parent: null, bindings: {} }] },
   });
 }
 function call(
@@ -145,4 +145,44 @@ test("diagnostic rendering prints containers, entries, enums and cycles without 
   machine.program.types.Mood = { kind: "enum" };
   const mood = machine.allocateObject({ kind: "data", type: named("Mood"), fields: {}, tag: "Happy" });
   assert.equal(machine.stringify(mood), "Mood.Happy");
+});
+
+test("legacy singleton methods retain implicit receivers and reject ambiguous overload selection", () => {
+  const machine = heap();
+  const signature = { id: "Counter.read", params: [], result: integer, suspend: false, scene: false };
+  machine.program.functions[signature.id] = { signature, init: false, local: false, code: [] };
+  // Earlier nongeneric definitions need neither a parameter list nor an overload array.
+  machine.program.types.Counter = { kind: "data", fields: {}, methods: { read: signature } };
+  const receiver = machine.allocateObject({ kind: "data", type: named("Counter"), fields: {} });
+  const type = { kind: "function", params: [], result: integer, suspend: false };
+  const selected = machine.getMember(receiver, "read", type);
+  assert.equal(selected.id, signature.id);
+  assert.deepEqual(selected.typeArgs, {});
+  machine.pushCall(selected, [], [], { direct: false });
+  assert.equal(machine.cell(machine.state.frames.at(-1).env, "this").value.ref, receiver.ref);
+  assert.throws(() => machine.pushCall(selected, [int(1)], ["absent"], { direct: true }), /unknown or duplicate/);
+  const second = { ...signature, id: "Counter.other", params: [{ name: "amount", ty: integer }] };
+  machine.program.types.Counter.methods.read = [signature, second];
+  assert.throws(() => machine.getMember(receiver, "read", type), /ambiguous/);
+  assert.equal(machine.getMember(receiver, "read", type, signature.id).id, signature.id);
+});
+
+test("member stringification and collection membership preserve checked method dispatch", () => {
+  const machine = heap();
+  assert.equal(call(machine, int(7), "toString", [], string).value, "7");
+  const list = machine.collectionValue(named("MutableList", integer), [int(7)]);
+  assert.equal(call(machine, list, "contains", [int(7)], boolean).value, true);
+  assert.equal(call(machine, list, "contains", [int(8)], boolean).value, false);
+  assert.throws(() => call(machine, list, "unrecognized", [], type("unit")), /unknown builtin method/);
+});
+
+test("indexed map assignments replace a present value without adding another key", () => {
+  const machine = heap();
+  const mapping = machine.collectionValue(named("MutableMap", string, integer), [
+    [value("string", "original"), int(1)],
+  ]);
+  const address = { kind: "address", ref: mapping.ref, key: value("string", "original") };
+  machine.writeAddress(address, int(2));
+  assert.equal(machine.readAddress(address).value, 2);
+  assert.equal(machine.object(mapping).entries.length, 1);
 });

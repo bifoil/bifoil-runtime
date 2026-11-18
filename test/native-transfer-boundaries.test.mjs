@@ -108,3 +108,36 @@ test("an empty native host restores data while preserving callable navigation me
   assert.equal(first.parent.nav.ownedMethod(), "Original navigation method");
   assert.equal(Object.hasOwn(first.parent.nav, "transient"), false);
 });
+
+test("ordinary native routines require return and nested scene calls retain their own stack", { skip: !engine }, () => {
+  const missingReturn = nativeEngineHost(engine, { native: "Original unfinished routine.\n" });
+  assert.throws(() => missingReturn.host.start(request(false)), /legacy subroutine reached the end without \*return/);
+  const nested = nativeEngineHost(engine, {
+    native: "*gosub_scene nested\nOriginal caller.\n*return\n",
+    nested: "Original nested.\n*return\n",
+  });
+  const reply = nested.host.start(request(false));
+  assert.equal(reply.status, "returned");
+  assert.deepEqual(reply.output, ["Original nested. Original caller."]);
+  assert.equal(nested.stats.scene, nested.parent);
+});
+
+test(
+  "an active native bridge leaves unrelated engine scenes on their original execution route",
+  { skip: !engine },
+  () => {
+    const first = nativeEngineHost(engine, { native: "Original.\n*page_break Continue\n*return\n" });
+    const waiting = first.host.start(request(false));
+    assert.equal(waiting.status, "waiting");
+    const scene = new first.context.Scene("unrelated", {}, first.parent.nav);
+    let loads = 0;
+    scene.loadScene = function () {
+      assert.equal(this, scene);
+      loads++;
+    };
+    scene.execute();
+    assert.equal(scene.executing, true);
+    assert.equal(loads, 1);
+    assert.equal(first.host.resume(request(false), waiting.continuation, 0).status, "returned");
+  },
+);
