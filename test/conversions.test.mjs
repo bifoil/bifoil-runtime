@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { VM } from "../src/vm.mjs";
-import { copyCollection } from "../src/conversions.mjs";
+import { copyCollection, convertValue } from "../src/conversions.mjs";
 import { typeValid } from "../src/types.mjs";
 
 const named = (name, ...args) => ({ kind: "named", name, args });
@@ -11,6 +11,45 @@ const intType = { kind: "int" };
 const floatType = { kind: "float" };
 const optional = (inner) => ({ kind: "nullable", inner });
 const fixture = () => new VM(JSON.parse(readFileSync(new URL("./fixtures/unicode.json", import.meta.url), "utf8")));
+
+test("explicit nullable root copies preserve null and detach a present mutable container", () => {
+  const machine = fixture();
+  const type = named("MutableList", intType),
+    nullable = optional(type);
+  const absent = { kind: "null", value: null };
+  assert.equal(convertValue(machine, absent, nullable, { copyRoot: true }), absent);
+  const source = machine.collectionValue(type, [integer(3)]);
+  const copied = convertValue(machine, source, nullable, { copyRoot: true });
+  assert.notEqual(copied.ref, source.ref);
+  assert.deepEqual(machine.object(copied).items, [integer(3)]);
+});
+
+test("fresh set conversion coalesces keys made equal by mutation while preserving the source", () => {
+  const machine = fixture();
+  const mutable = named("MutableList", intType);
+  const first = machine.collectionValue(mutable, [integer(1)]),
+    second = machine.collectionValue(mutable, [integer(2)]);
+  const source = machine.collectionValue(named("Set", mutable), [first, second]);
+  machine.writeAddress({ kind: "address", ref: second.ref, key: integer(0) }, integer(1));
+  const copied = machine.convert(source, named("Set", named("List", floatType)));
+  assert.equal(machine.object(source).items.length, 2);
+  assert.equal(machine.object(copied).items.length, 1);
+  assert.deepEqual(machine.object(machine.object(copied).items[0]).items, [{ kind: "float", value: 1 }]);
+  assert.equal(machine.object(first).items[0].kind, "int");
+});
+
+test("explicit map copies retain checked key identities and detach later indexed writes", () => {
+  const machine = fixture();
+  const key = { kind: "string", value: "original" },
+    type = named("MutableMap", { kind: "string" }, intType);
+  const source = machine.collectionValue(type, [[key, integer(1)]]);
+  const copied = copyCollection(machine, source, type);
+  assert.notEqual(copied.ref, source.ref);
+  assert.equal(machine.object(copied).entries[0][0], key);
+  machine.writeAddress({ kind: "address", ref: copied.ref, key }, integer(7));
+  assert.equal(machine.getIndex(source, key).value, 1);
+  assert.equal(machine.getIndex(copied, key).value, 7);
+});
 
 test("deep collection copies widen nullable leaves and preserve each source layer", () => {
   const machine = fixture();

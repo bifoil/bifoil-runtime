@@ -86,6 +86,8 @@ test("direct lazy loading uses its defaults, coalesces VM polling and reuses res
   const code = await provider.loadFunction(program.entry);
   assert.equal(code, program.functions[program.entry].code);
   assert.equal(await provider.loadFunction(program.entry), code);
+  const resident = await provider.loadModule(provider.headers[program.entry].module);
+  assert.equal(resident.functions[program.entry].code, code);
   assert.equal(reads.length, 1);
   const waiting = await finishLoading(machine, machine.run());
   assert.equal(waiting.status, "waiting");
