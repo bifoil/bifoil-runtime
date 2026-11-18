@@ -183,7 +183,7 @@ export function installChoiceScript(Scene, hooks = {}) {
     ).then(async (program) => {
       if (scene.bifoilSession !== pending) return null;
       started = attach(scene, program);
-      if (scene.bifoilLoading === ready) delete scene.bifoilLoading;
+      // attach owns clearing the previous loading handle.
       let result = started.run();
       while (result?.status === "loading") result = await result.ready;
       return scene.bifoilSession === started ? started : null;
