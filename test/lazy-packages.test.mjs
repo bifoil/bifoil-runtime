@@ -7,7 +7,8 @@ import { readCompiledProgram } from "../src/node-program.mjs";
 import { createHash } from "node:crypto";
 import { VM } from "../src/vm.mjs";
 import { loadPackage, loadCompiledProgram } from "../src/packages.mjs";
-import { packageCodeStats } from "../src/program-code.mjs";
+import { packageCodeStats, programCode } from "../src/program-code.mjs";
+import { loadLazyPackage } from "../src/lazy-packages.mjs";
 import { readBrowserCode } from "../src/browser-code.mjs";
 import { installChoiceScript } from "../src/choicescript.mjs";
 import { splitCompiledProgram } from "./support/packages.mjs";
@@ -66,6 +67,31 @@ async function finishLoading(machine, result) {
   output.push(...result.output);
   return { ...result, output };
 }
+
+test("direct lazy loading uses its defaults, coalesces VM polling and reuses resident code", async () => {
+  const data = packaged();
+  const reads = [];
+  const program = loadLazyPackage(data.manifest, async (name) => {
+    reads.push(name);
+    return data.sources.get(name);
+  });
+  const machine = new VM(program);
+  const first = machine.run();
+  assert.equal(first.status, "loading");
+  const polled = machine.run();
+  assert.equal(polled.status, "loading");
+  assert.equal(polled.ready, first.ready);
+  await first.ready;
+  const provider = programCode(program);
+  const code = await provider.loadFunction(program.entry);
+  assert.equal(code, program.functions[program.entry].code);
+  assert.equal(await provider.loadFunction(program.entry), code);
+  assert.equal(reads.length, 1);
+  const waiting = await finishLoading(machine, machine.run());
+  assert.equal(waiting.status, "waiting");
+  const final = await finishLoading(machine, machine.choose(0));
+  assert.deepEqual(final.output, expected);
+});
 
 test("lazy roots validate declarations without reading unused or active bodies", async () => {
   const data = packaged(),

@@ -58,9 +58,12 @@ test("malformed saved traversal cursors fail before a choice can resume", () => 
   }
 });
 
-test("earlier checkpoints can omit their empty traversal maps and still collect and resume", () => {
+test("earlier checkpoints can omit empty traversal maps and prose bases and still collect and resume", () => {
   const { program, state } = checkpoint();
-  for (const frame of state.frames) delete frame.iterators;
+  for (const frame of state.frames) {
+    delete frame.iterators;
+    delete frame.proseBase;
+  }
   const restored = VM.restore(program, JSON.stringify(state));
   const savedAgain = restored.save();
   const fresh = VM.restore(program, savedAgain);

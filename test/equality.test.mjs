@@ -104,3 +104,16 @@ test("scene identity and the public ordinary-comparison default retain their dis
   assert.equal(structuralEqual(vm, integer(1), { kind: "float", value: 1 }), true);
   assert.equal(structuralEqual(vm, integer(1), { kind: "float", value: 1 }, true), false);
 });
+
+test("progression equality compares the represented sequence and treats empty sequences alike", () => {
+  const vm = machine();
+  const first = { kind: "range", type: type("IntProgression"), first: 1, last: 5, step: 2, empty: false };
+  assert.equal(vm.equal(first, { ...first }), true);
+  assert.equal(vm.equal(first, { ...first, step: 1 }), false);
+  assert.equal(vm.equal(first, { ...first, last: 3 }), false);
+  assert.equal(vm.equal(first, integer(1)), false);
+  assert.equal(
+    vm.equal({ ...first, first: 5, last: 1, empty: true }, { ...first, first: 9, last: 3, empty: true }),
+    true,
+  );
+});

@@ -73,3 +73,52 @@ test("empty VM choices take explicit fallback while a terminal empty choice repo
   assert.equal(once.state.pending.options[0].once, "original-once");
   assert.equal(once.choose(0).status, "done");
 });
+
+test("an uninitialized immutable binding accepts one assignment and rejects a later write", () => {
+  const machine = new VM(
+    program([
+      { op: "uninitialized", name: "once", ty: { kind: "int" }, mutable: false },
+      constant("int", 7),
+      { op: "store", name: "once" },
+      { op: "load", name: "once" },
+      ...output,
+      constant("int", 8),
+      { op: "store", name: "once" },
+    ]),
+  );
+  assert.throws(() => machine.run(), /invalid binding assignment/);
+  assert.deepEqual(machine.state.transcript, ["7"]);
+});
+
+test("explicit boot calls evaluate omitted defaults once while ordinary calls require arguments", () => {
+  const input = program([
+    { op: "default", name: "seed", target: 3 },
+    constant("int", 7),
+    { op: "declare", name: "seed", ty: { kind: "int" }, mutable: false },
+    { op: "load", name: "seed" },
+    ...output,
+  ]);
+  input.functions[input.entry].signature.params = [
+    { name: "seed", ty: { kind: "int" }, mutable: false, default: true },
+  ];
+  for (const args of [[], [{ kind: "int", value: 9 }]]) {
+    const machine = new VM(input);
+    const kind = machine.functionType(input.functions[input.entry].signature).kind === "scene" ? "scene" : "function";
+    machine.pushCall(
+      { kind, id: input.entry, env: 0 },
+      args,
+      args.map(() => null),
+      { direct: false, boot: true },
+    );
+    machine.state.boot = [];
+    assert.deepEqual(machine.run().output, [args.length ? "9" : "7"]);
+  }
+  const ordinary = new VM(input);
+  const callable = ordinary.cell(0, input.entry).value;
+  assert.throws(() => ordinary.pushCall(callable, [], [], { direct: false }), /missing argument seed/);
+});
+
+test("an explicit unreachable instruction fails at its original source position", () => {
+  const machine = new VM(program([{ op: "unreachable" }]));
+  assert.throws(() => machine.run(), /src\/original.bfl:1: reached unreachable control flow/);
+});
