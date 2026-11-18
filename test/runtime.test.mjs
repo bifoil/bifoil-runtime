@@ -26,6 +26,11 @@ test("primitive comparison guards reject function values, incompatible ordered v
   assert.throws(() => binary("%", primitive("float", 3), integer(2)), /remainder requires Int/);
   assert.throws(() => binary("%", integer(3), primitive("float", 2)), /remainder requires Int/);
   assert.throws(() => binary("unknown", integer(3), integer(2)), /unsupported binary operator/);
+  assert.throws(() => binary("==", callable, callable), /incompatible equality/);
+  assert.equal(binary("===", integer(3), integer(4)).value, false);
+  assert.equal(binary("!=", integer(3), integer(3)).value, false);
+  assert.equal(binary("==", primitive("float", 3), integer(3)).value, true);
+  assert.equal(binary("<", primitive("string", "a"), primitive("string", "😀")).value, true);
 });
 
 test("compiled checkpoint preserves partial expressions, shared captured cells, and label snapshots", () => {

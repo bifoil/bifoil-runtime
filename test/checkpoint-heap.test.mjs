@@ -203,6 +203,35 @@ test("cyclic immutable keys survive restoration and mutable descendants are reje
   assert.throws(() => VM.restore(changed.program, changed.save()), /checkpoint key.*stable equality/);
 });
 
+test("stable key validation traverses maps and entries and rejects mutable descendants", () => {
+  for (const shape of ["map", "entry"]) {
+    for (const mutable of [false, true]) {
+      const machine = machineAtCheckpoint();
+      const payload = machine.collectionValue(named(mutable ? "MutableList" : "List", int), [
+        { kind: "int", value: 7 },
+      ]);
+      const key = { kind: "int", value: 1 };
+      const composite =
+        shape === "map"
+          ? machine.collectionValue(named("Map", int, machine.valueType(payload)), [[key, payload]])
+          : machine.allocateObject({
+              kind: "entry",
+              type: named("Entry", int, machine.valueType(payload)),
+              key,
+              value: payload,
+            });
+      retainKeys(machine, [composite], machine.valueType(composite));
+      if (mutable) assert.throws(() => VM.restore(machine.program, machine.save()), /checkpoint key.*stable equality/);
+      else {
+        const restored = VM.restore(machine.program, machine.save());
+        const stored = restored.object(restored.cell(0, "storedKeys").value).items[0];
+        const nested = shape === "map" ? restored.object(stored).entries[0][1] : restored.object(stored).value;
+        assert.equal(restored.getIndex(nested, { kind: "int", value: 0 }).value, 7);
+      }
+    }
+  }
+});
+
 test("restoration rejects duplicate stored set elements and map keys", () => {
   for (const kind of ["set", "map", "zero"]) {
     const machine = machineAtCheckpoint();

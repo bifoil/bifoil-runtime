@@ -1,7 +1,14 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { scalarLength, scalarAt, scalarSubstring, scalarOrder, isSingleScalar } from "../src/text.mjs";
+import {
+  scalarLength,
+  scalarAt,
+  scalarSubstring,
+  scalarOrder,
+  isSingleScalar,
+  validScalarOffset,
+} from "../src/text.mjs";
 import { isScalarString } from "../src/values.mjs";
 import { VM } from "../src/vm.mjs";
 import { collectGarbage } from "../src/collector.mjs";
@@ -28,6 +35,12 @@ test("Unicode operations preserve scalar boundaries, combining marks and prefix 
   assert.equal(isScalarString(String.fromCharCode(0xdfff)), false);
   assert.equal(isSingleScalar("😀"), true);
   assert.equal(isSingleScalar("e\u0301"), false);
+  assert.equal(isSingleScalar(1), false);
+  assert.equal(isSingleScalar(""), false);
+  assert.equal(scalarOrder("a", "😀"), -1);
+  assert.equal(validScalarOffset("😀", -1), false);
+  assert.equal(validScalarOffset("😀", 1), false);
+  assert.equal(validScalarOffset("😀", 2), true);
 });
 
 test("large Unicode values support validation and scalar access without a materialized traversal", () => {

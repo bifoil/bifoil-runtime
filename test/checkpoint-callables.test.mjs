@@ -2,6 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { VM } from "../src/vm.mjs";
+import { validateFrameCall } from "../src/checkpoint-callables.mjs";
+import { BifoilError } from "../src/errors.mjs";
 
 const int = { kind: "int" };
 const string = { kind: "string" };
@@ -98,4 +100,48 @@ test("active parameter cells must match the restored invocation rather than a re
     mutate(checkpoint);
     assert.throws(() => VM.restore(program, JSON.stringify(checkpoint)), /saved call parameter item/);
   }
+});
+
+test("saved-call validation reports unresolved result types and preserves unexpected host failures", () => {
+  for (const error of [new BifoilError("missing type"), new RangeError("original host failure")]) {
+    const { program, checkpoint } = prepared();
+    const machine = VM.restore(program, JSON.stringify(checkpoint));
+    const frame = machine.state.frames.at(-1);
+    machine.functionType = () => {
+      throw error;
+    };
+    if (error instanceof BifoilError)
+      assert.throws(() => validateFrameCall(machine, frame), /unresolved saved call type argument/);
+    else
+      assert.throws(
+        () => validateFrameCall(machine, frame),
+        (actual) => actual === error,
+      );
+  }
+});
+
+test("active variadic calls retain a fresh immutable List element contract across restoration", () => {
+  const { program } = prepared();
+  const signature = program.functions["test.wait"].signature;
+  signature.params[0].vararg = true;
+  signature.result = { kind: "named", name: "List", args: [parameter] };
+  const machine = new VM(program);
+  machine.pushCall(
+    { kind: "function", id: "test.wait", env: 0, typeArgs: { [parameter.name]: int } },
+    [
+      { kind: "int", value: 7 },
+      { kind: "int", value: 8 },
+    ],
+    [null, null],
+    { direct: false },
+  );
+  assert.equal(machine.run().status, "waiting");
+  const restored = VM.restore(program, machine.save());
+  const frame = restored.state.frames.at(-1);
+  const values = restored.cell(frame.env, "item").value;
+  assert.equal(values.type.name, "List");
+  assert.deepEqual(
+    restored.object(values).items.map((item) => item.value),
+    [7, 8],
+  );
 });

@@ -109,6 +109,27 @@ test("composite keys retain structural equality and text buckets preserve Char/S
   assert.equal(vm.getIndex(numbers, integer(0)).value, 4);
 });
 
+test("Boolean, Unit and null keys remain distinct through lookup and checkpoint restoration", () => {
+  const vm = machine();
+  const keys = [
+    { kind: "boolean", value: true },
+    { kind: "boolean", value: false },
+    { kind: "unit", value: null },
+    { kind: "null", value: null },
+  ];
+  const mapType = type("Map", [{ kind: "nullable", inner: { kind: "any" } }, intType]);
+  const mapping = vm.collectionValue(
+    mapType,
+    keys.map((key, index) => [key, integer(index)]),
+  );
+  vm.declare(0, "primitiveKeys", mapType, false, mapping);
+  for (const [index, key] of keys.entries()) assert.equal(vm.getIndex(mapping, key).value, index);
+  assert.equal(vm.run().status, "waiting");
+  const restored = VM.restore(vm.program, vm.save());
+  const saved = restored.cell(0, "primitiveKeys").value;
+  for (const [index, key] of keys.entries()) assert.equal(restored.getIndex(saved, key).value, index);
+});
+
 test("unordered primitive equality selects matching buckets without quadratic key comparisons", () => {
   const vm = machine();
   const size = 2048;
