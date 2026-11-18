@@ -221,3 +221,73 @@ test("named closure sites require distinct and consistent capture metadata", () 
   });
   assert.throws(() => new VM(inconsistent), /inconsistent named closure captures/);
 });
+
+function pairedClosureProgram(captures) {
+  const program = captureProgram();
+  const span = { file: "src/captures.bfl", line: 1 };
+  const factory = program.functions["capture.make"];
+  let next = 0;
+  factory.code = [
+    ...["first", "second"].map((name) => ({
+      op: "closure",
+      name,
+      function: "capture.read",
+      ...(captures === undefined ? {} : { captures }),
+      span,
+    })),
+    ...factory.code.map((instruction) =>
+      instruction.op === "function_value" ? { op: "load", name: ["first", "second"][next++], span } : instruction,
+    ),
+  ];
+  return program;
+}
+
+test("distinct closures with one target share captured cells across legacy and explicit capture metadata", () => {
+  for (const captures of [undefined, ["used"]]) {
+    const program = pairedClosureProgram(captures);
+    const machine = new VM(program);
+    assert.equal(machine.run().status, "waiting");
+    collectGarbage(machine);
+    const list = machine.cell(machine.state.frames[0].env, "saved").value;
+    const [first, second] = machine.object(list).items;
+    assert.notEqual(first, second);
+    assert.equal(first.env, second.env);
+    assert.equal(machine.state.envs[first.env].bindings.used, machine.state.envs[second.env].bindings.used);
+    const restored = VM.restore(program, machine.save());
+    assert.deepEqual(restored.choose(0).output, ["11", "12"]);
+  }
+});
+
+test("root-only captures release their factory environment without inventing root function cells", () => {
+  const program = pairedClosureProgram(["capture.zero"]);
+  const span = { file: "src/captures.bfl", line: 1 };
+  const read = program.functions["capture.read"];
+  read.code = [
+    { op: "load", name: "capture.zero", span },
+    { op: "call", names: [], direct: true, span },
+    { op: "return", span },
+  ];
+  program.functions["capture.zero"] = {
+    signature: { id: "capture.zero", params: [], result: { kind: "int" }, suspend: false, scene: false },
+    init: false,
+    local: false,
+    code: [
+      { op: "constant", ty: { kind: "int" }, value: 7, span },
+      { op: "return", span },
+    ],
+  };
+  const machine = new VM(program);
+  assert.equal(machine.run().status, "waiting");
+  const reclaimed = collectGarbage(machine);
+  assert.ok(reclaimed.envs >= 1);
+  const list = machine.cell(machine.state.frames[0].env, "saved").value;
+  assert.ok(machine.object(list).items.every((value) => value.env === 0));
+  assert.equal(Object.hasOwn(machine.state.envs[0].bindings, "capture.zero"), false);
+  assert.deepEqual(VM.restore(program, machine.save()).choose(0).output, ["7", "7"]);
+});
+
+test("equal-sized capture lists still reject a different named binding inventory", () => {
+  const program = pairedClosureProgram(["used"]);
+  program.functions["capture.make"].code[1].captures = ["unrelated"];
+  assert.throws(() => new VM(program), /inconsistent named closure captures/);
+});
